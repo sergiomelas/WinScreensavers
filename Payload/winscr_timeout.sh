@@ -49,7 +49,7 @@ case $Tim in
    Time=$(zenity --list  --title="Scrennesaver Timeout Configuration" --text "Pick an option" --column "Pick" --column "Answer" --radiolist  FALSE "30 seconds" FALSE "2 minutes" FALSE  "5 minutes" FALSE  "10 minutes"  FALSE  "15 minutes" FALSE "30 minutes" TRUE "1 hour" FALSE "Screensaver Disabled"  )
 
 ;;
-  '-1')
+  '1000000000')
    Time=$(zenity --list  --title="Scrennesaver Timeout Configuration" --text "Pick an option" --column "Pick" --column "Answer" --radiolist  FALSE "30 seconds" FALSE "2 minutes" FALSE  "5 minutes" FALSE  "10 minutes"  FALSE  "15 minutes" FALSE "30 minutes" FALSE "1 hour" TRUE "Screensaver Disabled"  )
 
 ;;
@@ -94,7 +94,7 @@ else #trasform choice in time
     ;;
     'Screensaver Disabled')
       echo  "Screensaver Disabled"
-      Tim=-1;
+      Tim=1000000000;
     ;;
     esac
     #write in conf

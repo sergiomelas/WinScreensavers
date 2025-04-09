@@ -4,7 +4,7 @@
 echo  " "
 echo  " ##################################################################"
 echo  " #                 Windows screensavers laucher                   #"
-echo  " #       Developed for X11 & KDE Plasma  by sergio melas 2024     #"
+echo  " #       Developed for X11 & KDE Plasma  by sergio melas 2025     #"
 echo  " #                                                                #"
 echo  " #                Emai: sergiomelas@gmail.com                     #"
 echo  " #                   Released unde GPV V2.0                       #"
@@ -13,21 +13,21 @@ echo  " ##################################################################"
 echo  " "
 
 
-# Run the screensaver subroutine
+#Run screensaver subroutine
 trigger_cmd() {
     #Check if any media is plaing
     SounRun=$( pacmd list-sink-inputs | grep -c 'state: RUNNING' )
     LockSc=$( cat /home/$USER/.winscr/lockscreen.conf )
     if [ $SounRun -eq '0' ]; then #if not run screensaver
-       SCR_SAVER=$( cat /home/$USER/.winscr/scrensaver.conf )
-       WINEPREFIX=/home/$USER/.winscr
-       wine /home/$USER/.winscr/drive_c/windows/system32/"$SCR_SAVER" /s
-       SysLockSc=$( qdbus org.freedesktop.ScreenSaver /org/freedesktop/ScreenSaver GetActive ) #ghet tatus of kde lockscreen
-       if [[ "$SysLockSc" == *false* ]]; then #If  kde didnt alredy losked the screen
+      SCR_SAVER=$( cat /home/$USER/.winscr/scrensaver.conf )
+      WINEPREFIX=/home/$USER/.winscr
+      wine /home/$USER/.winscr/drive_c/windows/system32/"$SCR_SAVER" /s
+      SysLockSc=$( /usr/lib/qt6/bin/qdbus  org.freedesktop.ScreenSaver /ScreenSaver GetActive ) #get status of kde lockscreen after scrrensaver exits
+      if [[ "$SysLockSc" == *false* ]]; then #If  kde didnt alredy losked the screen
           if [ $LockSc -gt '0' ]; then #if asked lock screen
               loginctl lock-session
           fi
-       fi
+      fi
     fi
 }
 
@@ -42,7 +42,7 @@ while sleep $(((sleep_time+999)/1000)); do
     IDLE_TIME=$(($SCR_TIME*1000))
     idle=$(xprintidle)
     echo "Waiting for Screensaver"
-    if [ $idle -ge $IDLE_TIME ]; then #if timout witout activity start screensaverone shot
+    if [ $idle -ge $IDLE_TIME ]; then #if timout witout activity start screensaver one shot
         if ! $triggered; then
             echo "Start Screensaver"
             trigger_cmd

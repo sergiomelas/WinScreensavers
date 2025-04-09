@@ -1,7 +1,7 @@
                      ##################################################################
                      ##################################################################
                      ###           Windows Screensavers for X11/KDE                 ###
-                     ### Developed by sergio melas (sergiomelas@gmail.com) 2024     ###
+                     ### Developed by sergio melas (sergiomelas@gmail.com) 2025     ###
                      ##################################################################
                      ##################################################################
 
@@ -30,7 +30,7 @@ Change log:
  -v2.0   28-07-2024: First pubblic release, added lock screen option,addes memory of timout
  -V2.1   31-07-2024: Corrected bugs with system lockscreen and scresaver choice, added memory of lockscreen
  -V2.1.1 10-08-2024: Updated Screensaver choice form
-
+ -V2.1.2 09-04-2025: Corrected bugs missing 386 libraries, updated for KDE6
 
 Thx to Christitus for the inspirational post : https://www.youtube.com/watch?v=J2zasJz5vuA&t=384s
 on youtube and the info below I used to create this

@@ -14,7 +14,7 @@ echo  " "
 
 echo  ""
 
-if [ $XDG_SESSION_TYPE  != 'x11' ] || [ $DESKTOP_SESSION != 'plasma' ]
+if [ $XDG_SESSION_TYPE  != 'x11' ] || [ $DESKTOP_SESSION != 'plasmax11' ]
 then
   echo  " "
   echo  " ############################################################################"
@@ -41,6 +41,7 @@ sudo apt-get install xprintidle
 sudo apt-get install xdotool
 sudo apt-get install zenity
 sudo apt-get install wine
+sudo apt-get install wine32
 sudo apt-get install appmenu-gtk2-module appmenu-gtk3-module
 
 
@@ -48,6 +49,7 @@ sudo apt-get install appmenu-gtk2-module appmenu-gtk3-module
 #Install wine bottle for scresavers
 rm -r /home/$USER/.winscr
 WINEARCH=win32 WINEPREFIX=/home/$USER/.winscr winecfg
+
 
 #copy screensavers in the bottle
 cd ./'Scr files'

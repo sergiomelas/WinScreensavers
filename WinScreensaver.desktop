@@ -1,0 +1,21 @@
+[Desktop Entry]
+Categories=Settings;Accessibility;
+Comment[en_US]=SCr for you
+Comment=SCr for you
+GenericName[en_US]=
+GenericName=
+MimeType=
+Name[en_US]=Windows Screensavers
+Name=Windows Screensavers
+Path=
+StartupNotify=true
+Terminal=false
+TerminalOptions=
+Type=Application
+Version=1.0
+X-DBUS-ServiceName=
+X-DBUS-StartupType=
+X-KDE-SubstituteUID=false
+X-KDE-Username=
+Icon=/home/sergio/.winscr/winscr_icon.png 
+Exec=/home/sergio/.winscr/winscr_menu.sh 
