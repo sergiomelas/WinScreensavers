@@ -20,7 +20,7 @@ Installation Instructions:
 - To intall screensavers that have an installer run:
 WINEPREFIX=/home/$USER/.winscr wine <path to installer>
 
-Note to be agle to enjoy the screensaver you shuld set yhe lock screen timeout and screen switch of timout larger of the screesaver timeout in kde plasma options
+Note to be able to enjoy the screensaver you shuld set yhe lock screen timeout and screen switch of timout larger of the screesaver timeout in kde plasma options
 
 
 ##################################################################################################################
