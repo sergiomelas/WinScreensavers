@@ -48,7 +48,7 @@ sudo apt-get install appmenu-gtk2-module appmenu-gtk3-module
 
 #Install wine bottle for scresavers
 rm -r /home/$USER/.winscr
-WINEARCH=win32 WINEPREFIX=/home/$USER/.winscr winecfg
+WINEPREFIX=/home/$USER/.winscr wineboot --init
 
 
 #copy screensavers in the bottle

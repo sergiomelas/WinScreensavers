@@ -3,11 +3,11 @@
 
 echo  " "
 echo  " ##################################################################"
-echo  " #                        Choose Timeout                      #"
+echo  " #                        Choose Timeout                          #"
 echo  " #       Developed for X11 & KDE Plasma  by sergio melas 2024     #"
 echo  " #                                                                #"
 echo  " #                Emai: sergiomelas@gmail.com                     #"
-echo  " #                   Released unde GPV V2.0                       #"
+echo  " #                   Released under GPL V2.0                      #"
 echo  " #                                                                #"
 echo  " ##################################################################"
 

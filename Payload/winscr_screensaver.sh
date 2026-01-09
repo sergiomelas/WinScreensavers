@@ -7,7 +7,7 @@ echo  " #                 Windows screensavers laucher                   #"
 echo  " #       Developed for X11 & KDE Plasma  by sergio melas 2025     #"
 echo  " #                                                                #"
 echo  " #                Emai: sergiomelas@gmail.com                     #"
-echo  " #                   Released unde GPV V2.0                       #"
+echo  " #                   Released under GPL V2.0                      #"
 echo  " #                                                                #"
 echo  " ##################################################################"
 echo  " "
@@ -16,14 +16,18 @@ echo  " "
 #Run screensaver subroutine
 trigger_cmd() {
     #Check if any media is plaing
-    SounRun=$( pacmd list-sink-inputs | grep -c 'state: RUNNING' )
+    MedRun=$( pacmd list-sink-inputs | grep -c 'state: RUNNING' )
+    #Read if lock screen is required
     LockSc=$( cat /home/$USER/.winscr/lockscreen.conf )
-    if [ $SounRun -eq '0' ]; then #if not run screensaver
+    if [ $MedRun -eq '0' ]; then #if no media running run screensaver
       SCR_SAVER=$( cat /home/$USER/.winscr/scrensaver.conf )
+      #Check if lock screen is running
+      SysLockSc=$( /usr/lib/qt6/bin/qdbus org.freedesktop.ScreenSaver /org/freedesktop/ScreenSaver GetActive ) #get status of kde lockscreen after scrrensaver exits
+      #Run Screensaver
       WINEPREFIX=/home/$USER/.winscr
       wine /home/$USER/.winscr/drive_c/windows/system32/"$SCR_SAVER" /s
-      SysLockSc=$( /usr/lib/qt6/bin/qdbus  org.freedesktop.ScreenSaver /ScreenSaver GetActive ) #get status of kde lockscreen after scrrensaver exits
-      if [[ "$SysLockSc" == *false* ]]; then #If  kde didnt alredy losked the screen
+
+      if [[ "$SysLockSc" == *"false"* ]]; then #If  kde didnt alredy locked the screen
           if [ $LockSc -gt '0' ]; then #if asked lock screen
               loginctl lock-session
           fi

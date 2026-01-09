@@ -1,7 +1,7 @@
                      ##################################################################
                      ##################################################################
                      ###           Windows Screensavers for X11/KDE                 ###
-                     ### Developed by sergio melas (sergiomelas@gmail.com) 2025     ###
+                     ### Developed by sergio melas (sergiomelas@gmail.com) 2026     ###
                      ##################################################################
                      ##################################################################
 
@@ -31,6 +31,9 @@ Change log:
  -V2.1   31-07-2024: Corrected bugs with system lockscreen and scresaver choice, added memory of lockscreen
  -V2.1.1 10-08-2024: Updated Screensaver choice form
  -V2.1.2 09-04-2025: Corrected bugs missing 386 libraries, updated for KDE6
+ -V2.1.3 22-08-2025: Corrected bug on alredy running lock screen
+ -V2.2   08-01-2026: Updated the bottle creation following new sintax
+
 
 Thx to Christitus for the inspirational post : https://www.youtube.com/watch?v=J2zasJz5vuA&t=384s
 on youtube and the info below I used to create this
