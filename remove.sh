@@ -1,32 +1,15 @@
 #!/bin/bash
-#This script will install autorotate system for KDE
+# filename: remove.sh
 
-echo  " "
-echo  " ##################################################################"
-echo  " #                       Remove scrennsaver                       #"
-echo  " #       Developed for X11 & KDE Plasma  by sergio melas 2024     #"
-echo  " #                                                                #"
-echo  " #                Emai: sergiomelas@gmail.com                     #"
-echo  " #                   Released unde GPV V2.0                       #"
-echo  " #                                                                #"
-echo  " ##################################################################"
-echo  " "
+echo " "
+echo " ##################################################################"
+echo " #                       Remove screensaver                       #"
+echo " #       Developed for X11 & KDE Plasma by sergio melas 2026      #"
+echo " ##################################################################"
 
-echo  ""
-
-
-#remove wine bottle for scresavers
-rm -r /home/$USER/.winscr
-
-#remove lauchers
-rm /home/$USER/.config/autostart/winscr_screensaver.sh.desktop
-rm /home/$USER/.local/share/applications/WinScreensaver.desktop
-
-
-
-
-
-
-
-
-
+WINEPREFIX_PATH="/home/$USER/.winscr"
+pkill -f "winscr_screensaver.sh"
+WINEPREFIX="$WINEPREFIX_PATH" wineserver -k9 2>/dev/null
+rm -rf "$WINEPREFIX_PATH"
+rm -f "$HOME/.config/autostart/winscr_service.desktop"
+rm -f "$HOME/.local/share/applications/WinScreensaver.desktop"

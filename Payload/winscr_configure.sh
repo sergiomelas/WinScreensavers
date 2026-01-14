@@ -1,25 +1,16 @@
 #!/bin/bash
-#This script will install autorotate system for KDE
+# filename: winscr_configure.sh
 
-echo  " "
-echo  " ##################################################################"
-echo  " #                     Configure scrennsaver                      #"
-echo  " #       Developed for X11 & KDE Plasma  by sergio melas 2024     #"
-echo  " #                                                                #"
-echo  " #                Emai: sergiomelas@gmail.com                     #"
-echo  " #                   Released under GPL V2.0                      #"
-echo  " #                                                                #"
-echo  " ##################################################################"
-echo  " "
+echo " "
+echo " ##################################################################"
+echo " #                     Configure scrennsaver                      #"
+echo " #       Developed for X11 & KDE Plasma by sergio melas 2026      #"
+echo " ##################################################################"
 
-echo  ""
+SCR_SAVER=$(cat /home/$USER/.winscr/scrensaver.conf)
+if [[ "$SCR_SAVER" != "Random.scr" ]]; then
+    WINEPREFIX=/home/$USER/.winscr
+    wine "/home/$USER/.winscr/drive_c/windows/system32/$SCR_SAVER"
+fi
 
-
-SCR_SAVER=$( cat /home/$USER/.winscr/scrensaver.conf )
-WINEPREFIX=/home/$USER/.winscr
-wine /home/$USER/.winscr/drive_c/windows/system32/"$SCR_SAVER"
-
-
-#reopen menu
-cmd="/home/$USER/.winscr/winscr_menu.sh"
-kstart5 bash $cmd  &
+kstart bash "/home/$USER/.winscr/winscr_menu.sh" &

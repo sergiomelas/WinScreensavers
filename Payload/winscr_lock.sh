@@ -1,10 +1,10 @@
 #!/bin/bash
-#This script will install autorotate system for KDE
+# filename: winscr_lock.sh
 
 echo  " "
 echo  " ##################################################################"
-echo  " #                     Configure scrennsaver                      #"
-echo  " #       Developed for X11 & KDE Plasma  by sergio melas 2024     #"
+echo  " #                     Configure Lock Screen                      #"
+echo  " #       Developed for X11 & KDE Plasma  by sergio melas 2026     #"
 echo  " #                                                                #"
 echo  " #                Emai: sergiomelas@gmail.com                     #"
 echo  " #                   Released under GPL V2.0                      #"
@@ -12,54 +12,45 @@ echo  " #                                                                #"
 echo  " ##################################################################"
 echo  " "
 
-echo  ""
+# Read current configuration
+# 0 = No (Disabled), 1 = Yes (Enabled)
+LockS=$( cat /home/$USER/.winscr/lockscreen.conf 2>/dev/null || echo "0" )
 
-
-
-echo -n "Choose the locksession : "
-
-#lauch form with current timeout
-LockS=$( cat /home/$USER/.winscr/lockscreen.conf )
-case $LockS in
-   '0')
-     LockScr=$(zenity --list  --title="Lock Screen Configuration:" --text "Do you want to lock screen? " --column "Pick" --column "Answer" --radiolist  TRUE "No" FALSE "Yes"  )
-   ;;
-   '1')
-     LockScr=$(zenity --list  --title="Lock Screen Configuration:" --text "Do you want to lock screen? " --column "Pick" --column "Answer" --radiolist  FALSE "No" TRUE "Yes"  )
-   ;;
-esac
-
-
-
-
-if [ -z "$LockScr" ]
-then
-      zenity --info --timeout 2 --text="No option chosen! Defaulting to lock screen" #user aborted
-      LockSc=1;
+# Logic to set the radio buttons based on the config file
+if [ "$LockS" == "1" ]; then
+    # If config is 1, set Yes to TRUE
+    R_NO="FALSE"
+    R_YES="TRUE"
 else
-    echo  -n "The chosen lockscreen option is:  $LockScr"
-
-    case $LockScr in
-     'Yes')
-        echo  "Lock screen active"
-        LockSc=1;
-        ;;
-      'No')
-        echo  "Lock screen inactive"
-        LockSc=0;
-   ;;
-   *)
-   zenity --info --timeout 2 --text="No option chosen! Defaulting to lock screen" #user aborted
-   LockSc=1;
-   ;;
-   esac
-
-
+    # If config is 0 or file missing, set No to TRUE
+    R_NO="TRUE"
+    R_YES="FALSE"
 fi
 
-rm /home/$USER/.winscr/lockscreen.conf
-echo $LockSc   |  tee -a /home/$USER/.winscr/lockscreen.conf       > /dev/null
+# Launch Zenity form with the correct radio button pre-selected
+LockScr=$(zenity --list --radiolist --title="Lock Screen Configuration" \
+    --text "Do you want to lock the session when the screensaver ends?" \
+    --column "Pick" --column "Answer" \
+    $R_NO "No" $R_YES "Yes" --height=250 --width=350)
 
-#reopen menu
-cmd="/home/$USER/.winscr/winscr_menu.sh"
-kstart5 bash $cmd  &
+# Process Choice
+if [ -z "$LockScr" ]; then
+    # If user hits Cancel, do not change anything
+    # Reopen the main menu using modern KDE kstart
+    kstart bash /home/$USER/.winscr/winscr_menu.sh &
+else
+    if [ "$LockScr" == "Yes" ]; then
+        echo "Lock screen active"
+        LockVal=1
+    else
+        echo "Lock screen inactive"
+        LockVal=0
+    fi
+
+    # Save the choice back to the config file
+    echo $LockVal > /home/$USER/.winscr/lockscreen.conf
+    # Reopen the main menu using modern KDE kstart
+    kstart bash /home/$USER/.winscr/winscr_menu.sh &
+fi
+
+

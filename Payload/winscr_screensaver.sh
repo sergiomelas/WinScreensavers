@@ -1,62 +1,93 @@
 #!/bin/bash
-#This script will lauch windows screensaver
+# filename: winscr_screensaver.sh
 
-echo  " "
-echo  " ##################################################################"
-echo  " #                 Windows screensavers laucher                   #"
-echo  " #       Developed for X11 & KDE Plasma  by sergio melas 2025     #"
-echo  " #                                                                #"
-echo  " #                Emai: sergiomelas@gmail.com                     #"
-echo  " #                   Released under GPL V2.0                      #"
-echo  " #                                                                #"
-echo  " ##################################################################"
-echo  " "
+echo " "
+echo " ##################################################################"
+echo " #                 Windows screensavers launcher                  #"
+echo " #       Developed for X11 & KDE Plasma by sergio melas 2026      #"
+echo " #                                                                #"
+echo " #                Emai: sergiomelas@gmail.com                     #"
+echo " #                   Released under GPL V2.0                      #"
+echo " #                                                                #"
+echo " ##################################################################"
+echo " "
 
+WINEPREFIX_PATH="/home/$USER/.winscr"
+SCR_DIR="$WINEPREFIX_PATH/drive_c/windows/system32"
+export WINEPREFIX="$WINEPREFIX_PATH"
+SCRIPT_PID=$$
 
-#Run screensaver subroutine
 trigger_cmd() {
-    #Check if any media is plaing
-    MedRun=$( pacmd list-sink-inputs | grep -c 'state: RUNNING' )
-    #Read if lock screen is required
-    LockSc=$( cat /home/$USER/.winscr/lockscreen.conf )
-    if [ $MedRun -eq '0' ]; then #if no media running run screensaver
-      SCR_SAVER=$( cat /home/$USER/.winscr/scrensaver.conf )
-      #Check if lock screen is running
-      SysLockSc=$( /usr/lib/qt6/bin/qdbus org.freedesktop.ScreenSaver /org/freedesktop/ScreenSaver GetActive ) #get status of kde lockscreen after scrrensaver exits
-      #Run Screensaver
-      WINEPREFIX=/home/$USER/.winscr
-      wine /home/$USER/.winscr/drive_c/windows/system32/"$SCR_SAVER" /s
+    MedRun=$(pacmd list-sink-inputs 2>/dev/null | grep -c 'state: RUNNING')
+    LockSc=$(cat "$WINEPREFIX_PATH/lockscreen.conf" 2>/dev/null || echo "0")
 
-      if [[ "$SysLockSc" == *"false"* ]]; then #If  kde didnt alredy locked the screen
-          if [ $LockSc -gt '0' ]; then #if asked lock screen
-              loginctl lock-session
-          fi
-      fi
+    if [ "$MedRun" -eq '0' ]; then
+        SCR_SAVER=$(cat "$WINEPREFIX_PATH/scrensaver.conf" 2>/dev/null || echo "Random.scr")
+        SysLockSc=$(/usr/lib/qt6/bin/qdbus org.freedesktop.ScreenSaver /org/freedesktop/ScreenSaver GetActive)
+
+        PREVIOUS_PID=""
+
+        if [[ "$SCR_SAVER" == "Random.scr" ]]; then
+            while true; do
+                # 1. Read the user-defined rotation period (Default to 60s)
+                PERIOD=$(cat "$WINEPREFIX_PATH/random_period.conf" 2>/dev/null || echo "60")
+
+                # 2. Select next random screensaver
+                readarray -t array < <(find "$SCR_DIR" -maxdepth 1 -name "*.scr" -printf "%f\n")
+                [[ ${#array[@]} -eq 0 ]] && return
+                CURRENT_SCR="${array[$(( RANDOM % ${#array[@]} ))]}"
+
+                # 3. Seamless Transition: Launch new before killing old
+                wine "$SCR_DIR/$CURRENT_SCR" /s &
+                NEW_PID=$!
+                sleep 1.5
+
+                [ -n "$PREVIOUS_PID" ] && kill -9 "$PREVIOUS_PID" 2>/dev/null
+                PREVIOUS_PID=$NEW_PID
+
+                # 4. Monitor for activity OR screen blanking
+                USER_ACTIVE=false
+                LOOPS=$(( PERIOD * 2 ))
+                for (( i=0; i<LOOPS; i++ )); do
+                    sleep 0.5
+                    if [ "$(xprintidle)" -lt 500 ]; then
+                        USER_ACTIVE=true
+                        break
+                    fi
+                    if [[ "$(xset q)" == *"Monitor is Off"* ]]; then
+                        USER_ACTIVE=true
+                        break
+                    fi
+                done
+
+                if $USER_ACTIVE; then
+                    WINE_PIDS=$(pgrep -f "$WINEPREFIX_PATH" | grep -v "^$SCRIPT_PID$")
+                    [ -n "$WINE_PIDS" ] && kill -9 $WINE_PIDS 2>/dev/null
+                    wineserver -k9 2>/dev/null
+                    break
+                fi
+            done
+        else
+            wine "$SCR_DIR/$SCR_SAVER" /s &
+            WINE_PID=$!
+            while true; do
+                sleep 1
+                if [ "$(xprintidle)" -lt 1000 ] || [[ "$(xset q)" == *"Monitor is Off"* ]]; then
+                    kill -9 "$WINE_PID" 2>/dev/null
+                    wineserver -k9 2>/dev/null
+                    break
+                fi
+            done
+        fi
+        [[ "$SysLockSc" == *"false"* ]] && [[ "$LockSc" -gt '0' ]] && loginctl lock-session
     fi
 }
 
-sleep_time=$IDLE_TIME
-triggered=false
-
-#enter main screen loop
-while sleep $(((sleep_time+999)/1000)); do
-    #screensaver time in seconds
-    SCR_TIME=$( cat /home/$USER/.winscr/timeout.conf )
-    # Calculate idle time time in millisencos
-    IDLE_TIME=$(($SCR_TIME*1000))
-    idle=$(xprintidle)
-    echo "Waiting for Screensaver"
-    if [ $idle -ge $IDLE_TIME ]; then #if timout witout activity start screensaver one shot
-        if ! $triggered; then
-            echo "Start Screensaver"
-            trigger_cmd
-            triggered=true
-            sleep_time=$IDLE_TIME
-        fi
-    else
-        triggered=false #reset trigger for one shot
-        # Give 100 ms buffer to avoid frantic loops shortly before triggers.
-        sleep_time=$((IDLE_TIME-idle+100))
+while true; do
+    SCR_TIME=$(cat "$WINEPREFIX_PATH/timeout.conf" 2>/dev/null || echo "60")
+    IDLE_LIMIT=$((SCR_TIME * 1000))
+    if [ "$(xprintidle)" -ge "$IDLE_LIMIT" ]; then
+        trigger_cmd
     fi
-    sleep 1 #idle for cpu to minimise resource
+    sleep 2
 done

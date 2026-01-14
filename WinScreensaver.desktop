@@ -2,8 +2,10 @@
 Categories=Settings;Accessibility;
 Comment[en_US]=SCr for you
 Comment=SCr for you
+Exec=/home/sergio/.winscr/winscr_menu.sh
 GenericName[en_US]=
 GenericName=
+Icon=/home/sergio/.winscr/winscr_icon.png
 MimeType=
 Name[en_US]=Windows Screensavers
 Name=Windows Screensavers
@@ -17,5 +19,3 @@ X-DBUS-ServiceName=
 X-DBUS-StartupType=
 X-KDE-SubstituteUID=false
 X-KDE-Username=
-Icon=/home/sergio/.winscr/winscr_icon.png 
-Exec=/home/sergio/.winscr/winscr_menu.sh 

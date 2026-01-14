@@ -1,113 +1,46 @@
 #!/bin/bash
-#This script will install autorotate system for KDE
+# filename: install.sh
 
-echo  " "
-echo  " ##################################################################"
-echo  " #                       Install scrennsaver                      #"
-echo  " #       Developed for X11 & KDE Plasma  by sergio melas 2024     #"
-echo  " #                                                                #"
-echo  " #                Emai: sergiomelas@gmail.com                     #"
-echo  " #                   Released unde GPV V2.0                       #"
-echo  " #                                                                #"
-echo  " ##################################################################"
-echo  " "
+echo " "
+echo " ##################################################################"
+echo " #                       Install screensaver                      #"
+echo " #       Developed for X11 & KDE Plasma by sergio melas 2026      #"
+echo " ##################################################################"
 
-echo  ""
+[[ "$XDG_SESSION_TYPE" != "x11" ]] && exit 0
 
-if [ $XDG_SESSION_TYPE  != 'x11' ] || [ $DESKTOP_SESSION != 'plasmax11' ]
-then
-  echo  " "
-  echo  " ############################################################################"
-  echo  " #  KDE Windows Screensavers support only systems with KDE Plasma on Xorg   #"
-  echo  " #                     Installation Aborted                                 #"
-  echo  " ############################################################################"
-  echo  " "
-  exit 0
-fi
+sudo apt-get update && sudo apt-get install -y libnotify-bin xprintidle xdotool zenity wine wine32 x11-xserver-utils pgrep
 
-VAR=$0
-DIR="$(dirname "${VAR}")"
-cd  "${DIR}"
+INSTALL_DIR="/home/$USER/.winscr"
+rm -rf "$INSTALL_DIR"
+WINEPREFIX="$INSTALL_DIR" wineboot --init
 
+cp ./Payload/*.sh "$INSTALL_DIR/"
+cp ./Payload/winscr_icon.png "$INSTALL_DIR/"
+cp ./Payload/*.conf "$INSTALL_DIR/"
 
-echo  "Login as administrator to install"
-sudo ls >/dev/null
-echo  ""
+cp ./'Scr files'/*.scr "$INSTALL_DIR/drive_c/windows/system32/"
+chmod +x "$INSTALL_DIR"/*.sh
 
-echo  "Installing Libraries:"
-echo  ""
-sudo apt-get install libnotify-bin
-sudo apt-get install xprintidle
-sudo apt-get install xdotool
-sudo apt-get install zenity
-sudo apt-get install wine
-sudo apt-get install wine32
-sudo apt-get install appmenu-gtk2-module appmenu-gtk3-module
+echo "Random.scr" > "$INSTALL_DIR/scrensaver.conf"
+echo "300" > "$INSTALL_DIR/timeout.conf"
+echo "0" > "$INSTALL_DIR/lockscreen.conf"
+echo "60" > "$INSTALL_DIR/random_period.conf"
 
+cat <<EOF > "$HOME/.local/share/applications/WinScreensaver.desktop"
+[Desktop Entry]
+Name=WinScreensaver
+Exec=$INSTALL_DIR/winscr_menu.sh
+Icon=$INSTALL_DIR/winscr_icon.png
+Type=Application
+EOF
 
+cat <<EOF > "$HOME/.config/autostart/winscr_service.desktop"
+[Desktop Entry]
+Name=WinScreensaver Service
+Exec=$INSTALL_DIR/winscr_screensaver.sh
+Type=Application
+X-KDE-AutostartScript=true
+EOF
 
-#Install wine bottle for scresavers
-rm -r /home/$USER/.winscr
-WINEPREFIX=/home/$USER/.winscr wineboot --init
-
-
-#copy screensavers in the bottle
-cd ./'Scr files'
-cp * /home/$USER/.winscr/drive_c/windows/system32/
-
-cd ..
-
-#Copy scripts in the bottle
-cd ./Payload
-
-cp * /home/$USER/.winscr
-
-cd ..
-
-#Copy autostart and settings lachers
-rm  /home/$USER/.config/autostart/winscr_screensaver.sh.desktop
-rm  /home/$USER/.local/share/applications/WinScreensaver.desktop
-cd ./'Launch'
-cp ./WinScreensaver.desktop /home/$USER/.local/share/applications/
-cp ./winscr_screensaver.sh.desktop /home/$USER/.config/autostart/
-
-cd  /home/$USER/.config/autostart/
-#Remove $USER with actual user name in the Exec clause of the autostart laucher (KDE bug workaround)
-command="Exec=/home/$USER/.winscr/winscr_screensaver.sh"
-file="'./winscr_screensaver.sh.desktop'"
-command="echo \""$command" \">>  "$file
-eval $command
-
-cd  /home/$USER/.local/share/applications/
-#Remove $USER with actual user name in the Exec clause of the autostart laucher (KDE bug workaround)
-command="Icon=/home/$USER/.winscr/winscr_icon.png"
-file="'./WinScreensaver.desktop'"
-command="echo \""$command" \">>  "$file
-eval $command
-
-command="Exec=/home/$USER/.winscr/winscr_menu.sh"
-file="'./WinScreensaver.desktop'"
-command="echo \""$command" \">>  "$file
-eval $command
-
-
-#Run the first config
-kstart5 bash /home/$USER/.winscr/winscr_choose.sh
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+kstart bash "$INSTALL_DIR/winscr_choose.sh" &

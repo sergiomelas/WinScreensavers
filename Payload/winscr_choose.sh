@@ -1,54 +1,61 @@
 #!/bin/bash
-#This script will install autorotate system for KDE
+# filename: winscr_choose.sh
 
-echo  " "
-echo  " ##################################################################"
-echo  " #                        Choose scrennsaver                      #"
-echo  " #       Developed for X11 & KDE Plasma  by sergio melas 2024     #"
-echo  " #                                                                #"
-echo  " #                Emai: sergiomelas@gmail.com                     #"
-echo  " #                   Released under GPL V2.0                      #"
-echo  " #                                                                #"
-echo  " ##################################################################"
-echo  " "
+echo " "
+echo " ##################################################################"
+echo " #                        Choose screensaver                      #"
+echo " #       Developed for X11 & KDE Plasma by sergio melas 2026      #"
+echo " #                                                                #"
+echo " #                Emai: sergiomelas@gmail.com                     #"
+echo " #                   Released under GPL V2.0                      #"
+echo " #                                                                #"
+echo " ##################################################################"
+echo " "
 
-echo  ""
+WINE_DIR="/home/$USER/.winscr/drive_c/windows/system32"
+# Read current config (e.g., "Random.scr" or "Mystify.scr")
+CURRENT_SCR=$(cat /home/$USER/.winscr/scrensaver.conf 2>/dev/null || echo "Random.scr")
 
+# 1. Get the list of all .scr files
+readarray -t file_list < <(cd "$WINE_DIR" && ls *.scr)
 
-echo  ""
-echo -n "Choose the screensaver : "
+# 2. Build the Zenity argument list with TRUE/FALSE toggles
+# Format: [State] [Name]
+ZEN_LIST=()
 
-#Get List Of Avaliable Screen Saver
-readarray array < <((cd  /home/$USER/.winscr/drive_c/windows/system32 &&ls *.scr))
-
-#Remove estenction for nice list
-for i in "${!array[@]}"; do
- arrayz[$i]=$( basename -a "${array[$i]%.*}" )
-done
-
-#ask user to choose screen saver
-arrayz=( "Dummy" "${arrayz[@]}" )
-SCR=$(zenity --entry --title "Winscr Chooser" --text "${arrayz[@]}" --text "Plese choose the screensaver")
-
-
-if [ -z "$SCR" ]
-then
-    zenity --info --timeout 2 --text="No screesaver chosen!" #user aborted
-    SCR_SAVER=$( cat /home/$USER/.winscr/scrensaver.conf )
-    SCR=$SCR_SAVER
+# Handle the "Random" option first
+if [[ "$CURRENT_SCR" == "Random.scr" ]]; then
+    ZEN_LIST+=("TRUE" "Random")
 else
-    SCR=$SCR.scr
-    echo  -n "The chosen screesaver is:  $SCR"
+    ZEN_LIST+=("FALSE" "Random")
 fi
 
-rm /home/$USER/.winscr/scrensaver.conf
-echo $SCR | tee -a /home/$USER/.winscr/scrensaver.conf  > /dev/null
+# Handle all other screensavers
+for file in "${file_list[@]}"; do
+    NAME="${file%.*}"
+    if [[ "$file" == "$CURRENT_SCR" ]]; then
+        ZEN_LIST+=("TRUE" "$NAME")
+    else
+        ZEN_LIST+=("FALSE" "$NAME")
+    fi
+done
 
-#reopen menu
-cmd="/home/$USER/.winscr/winscr_menu.sh"
-kstart5 bash $cmd  &
+# 3. Launch Zenity list with radiobuttons
+SCR=$(zenity --list --radiolist --title "Winscr Chooser" \
+    --text "Current: $CURRENT_SCR" \
+    --column "Pick" --column "Screensavers" \
+    "${ZEN_LIST[@]}" --height=500 --width=350)
 
+# 4. Save Selection
+if [ -n "$SCR" ]; then
+    if [ "$SCR" == "Random" ]; then
+        FINAL_VAL="Random.scr"
+    else
+        FINAL_VAL="$SCR.scr"
+    fi
+    echo "$FINAL_VAL" > /home/$USER/.winscr/scrensaver.conf
+    echo "Saved: $FINAL_VAL"
+fi
 
-
-
-
+# Reopen menu using modern KDE kstart
+kstart bash "/home/$USER/.winscr/winscr_menu.sh" &

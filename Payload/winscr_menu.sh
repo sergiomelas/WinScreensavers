@@ -1,64 +1,44 @@
 #!/bin/bash
-#This script will install autorotate system for KDE
+# filename: winscr_menu.sh
 
-echo  " "
-echo  " ##################################################################"
-echo  " #                        Choose Option Menu                      #"
-echo  " #       Developed for X11 & KDE Plasma  by sergio melas 2024     #"
-echo  " #                                                                #"
-echo  " #                Emai: sergiomelas@gmail.com                     #"
-echo  " #                   Released under GPL V2.0                      #"
-echo  " #                                                                #"
-echo  " ##################################################################"
+echo " "
+echo " ##################################################################"
+echo " #                        Choose Option Menu                      #"
+echo " #       Developed for X11 & KDE Plasma by sergio melas 2026      #"
+echo " #                                                                #"
+echo " #                Emai: sergiomelas@gmail.com                     #"
+echo " #                   Released under GPL V2.0                      #"
+echo " #                                                                #"
+echo " ##################################################################"
 
+WINEPREFIX_PATH="/home/$USER/.winscr"
+SCR_SAVER=$(cat "$WINEPREFIX_PATH/scrensaver.conf" 2>/dev/null || echo "Random.scr")
 
-VAR=$0
-DIR="$(dirname "${VAR}")"
-cd  "${DIR}"
+MENU_ITEMS=( FALSE "Choose Screensaver" )
 
-Choice="Choose Screensaver"
+if [[ "$SCR_SAVER" == "Random.scr" ]]; then
+    MENU_ITEMS+=( FALSE "Random Change Period Configuration" )
+else
+    MENU_ITEMS+=( FALSE "Test Screensaver" FALSE "Screensaver Configuration" )
+fi
 
-echo  ""
-echo -n "Plese choose an option"
+MENU_ITEMS+=(
+    FALSE "Locking Screen Configuration"
+    FALSE "Activation Timeout Configuration"
+    FALSE "About"
+)
 
-Choice=$(zenity --list  --title="Win Screensavers Menu" --text "Pick an option" --column "Pick" --column "Answer"  --radiolist  FALSE "Choose Screensaver" FALSE "Test Screensaver"  FALSE "Screensaver Configuration"  FALSE "Locking Screen Configuration" FALSE "Activation Timeout Configuration"  FALSE "About"  )
+Choice=$(zenity --list --radiolist --title="Win Screensavers Menu" \
+    --text "Current Mode: $SCR_SAVER" \
+    --column "Pick" --column "Answer" \
+    "${MENU_ITEMS[@]}" --height=400 --width=400)
 
-#process menu choice
 case $Choice in
-  'Choose Screensaver')
-    echo  "Choose Screensaver"
-    cmd="/home/$USER/.winscr/winscr_choose.sh"
-    kstart5 bash $cmd  &
-  ;;
-  'Test Screensaver')
-    echo  "Test Screensaver"
-    cmd="/home/$USER/.winscr/winscr_test.sh"
-    kstart5 bash $cmd  &
-  ;;
-  'Screensaver Configuration')
-    echo  "Configure Screensaver"
-    cmd="/home/$USER/.winscr/winscr_configure.sh"
-    kstart5 bash $cmd  &
-  ;;
-  'Activation Timeout Configuration')
-    echo  "Configure Timout"
-    cmd="/home/$USER/.winscr/winscr_timeout.sh"
-    kstart5 bash  $cmd  &
-  ;;
-  'Locking Screen Configuration')
-    echo  "Configure Timout"
-    cmd="/home/$USER/.winscr/winscr_lock.sh"
-    kstart5 bash  $cmd  &
-  ;;
-  'About')
-    echo  "About SCreen"
-    cmd="/home/$USER/.winscr/winscr_about.sh"
-    kstart5 bash  $cmd  &
-    ;;
+    'Choose Screensaver') kstart bash "$WINEPREFIX_PATH/winscr_choose.sh" & ;;
+    'Random Change Period Configuration') kstart bash "$WINEPREFIX_PATH/winscr_random_period.sh" & ;;
+    'Test Screensaver') kstart bash "$WINEPREFIX_PATH/winscr_test.sh" & ;;
+    'Screensaver Configuration') kstart bash "$WINEPREFIX_PATH/winscr_configure.sh" & ;;
+    'Activation Timeout Configuration') kstart bash "$WINEPREFIX_PATH/winscr_timeout.sh" & ;;
+    'Locking Screen Configuration') kstart bash "$WINEPREFIX_PATH/winscr_lock.sh" & ;;
+    'About') kstart bash "$WINEPREFIX_PATH/winscr_about.sh" & ;;
 esac
-
-
-
-
-
-
