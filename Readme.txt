@@ -21,6 +21,8 @@ WINEPREFIX=/home/$USER/.winscr wine <path to installer>
 
 Note to be able to enjoy the screensaver you shuld set the lock screen timeout and screen switch of timout larger of the screesaver timeout in kde plasma options
 
+You can find the latest version of this software here:https://github.com/sergiomelas/Kde-X11-Screensavers
+
 
 ##################################################################################################################
 Change log:
