@@ -14,7 +14,6 @@ Installation Instructions:
 - Copy the windows  screensavers .scr file in the "SCR files" folder before install
 - double click on the Run-me.sh file
 - This will lauch the install.sh script in konsole
-- When wine bottle config arrives chose windows XP
 - Then choose the screensaver and timeout
 - Login Logout to activate
 - To intall screensavers that have an installer run:
