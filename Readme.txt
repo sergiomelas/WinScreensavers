@@ -33,7 +33,7 @@ Change log:
  -V2.1.1 10-08-2024: Updated Screensaver choice form
  -V2.1.2 09-04-2025: Corrected bugs missing 386 libraries, updated for KDE6
  -V2.1.3 22-08-2025: Corrected bug on alredy running lock screen
- -V2.2   14-01-2026: Updated the bottle creation following new sintax, upgraded menus beaviours with chosen option, clean up
+ -V2.2   14-01-2026: Updated the bottle creation following new sintax, upgraded menus beaviours with chosen option, added random screensaver cycling, clean up
 
 
 Thx to Christitus for the inspirational post : https://www.youtube.com/watch?v=J2zasJz5vuA&t=384s
