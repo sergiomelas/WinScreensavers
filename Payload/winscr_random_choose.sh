@@ -5,10 +5,6 @@ echo " "
 echo " ##################################################################"
 echo " #              Choose Random scr list  Menu                      #"
 echo " #       Developed for X11 & KDE Plasma by sergio melas 2026      #"
-echo " #                                                                #"
-echo " #                Emai: sergiomelas@gmail.com                     #"
-echo " #                   Released under GPL V2.0                      #"
-echo " #                                                                #"
 echo " ##################################################################"
 
 WINEPREFIX_PATH="/home/$USER/.winscr"
@@ -18,18 +14,16 @@ RANDOM_CONF="$WINEPREFIX_PATH/random_list.conf"
 # 1. Get the list of available screensavers
 readarray -t array < <(find "$SCR_DIR" -maxdepth 1 -name "*.scr" -printf "%f\n" | sort)
 
-# Check if any screensavers exist
 if [[ ${#array[@]} -eq 0 ]]; then
     zenity --error --text="No Windows screensavers found in $SCR_DIR"
     exit 1
 fi
 
-# 2. Build the Zenity checklist arguments with SMART PRE-SELECTION
+# 2. Build Zenity arguments and track current state for comparison
+BEFORE_STATE=$(cat "$RANDOM_CONF" 2>/dev/null)
 ZEN_ARGS=()
+
 for scr in "${array[@]}"; do
-    # COSMETIC LOGIC:
-    # If the config file do NOT exist, pre-select EVERYTHING (TRUE)
-    # If the config file DOES exist, check if this specific file is inside it
     if [[ ! -f "$RANDOM_CONF" ]]; then
         STATE="TRUE"
     else
@@ -39,7 +33,6 @@ for scr in "${array[@]}"; do
             STATE="FALSE"
         fi
     fi
-
     ZEN_ARGS+=("$STATE" "$scr")
 done
 
@@ -50,16 +43,18 @@ CHOICE=$(zenity --list --checklist \
     --column="Include" --column="Screensaver Name" \
     "${ZEN_ARGS[@]}" --separator=$'\n' --height=500 --width=400)
 
-# 4. Save selections to the relative config file
+# 4. Save selections with intelligent notification
 if [ $? -eq 0 ]; then
-    echo "$CHOICE" > "$RANDOM_CONF"
-
-    # Count selections for the notification
-    COUNT=$(echo "$CHOICE" | grep -c ".scr")
-    zenity --info --text="Random pool updated! $COUNT screensavers selected." --timeout=3
+    # Compare new choice with the previous state
+    if [[ "$CHOICE" == "$BEFORE_STATE" ]]; then
+        zenity --info --text="No changes made to the random list." --timeout=3
+    else
+        echo "$CHOICE" > "$RANDOM_CONF"
+        COUNT=$(echo "$CHOICE" | grep -c ".scr")
+        zenity --info --text="Random pool updated! $COUNT screensavers selected." --timeout=3
+    fi
 else
     echo "Selection canceled."
 fi
 
-# Standard behavior: call back the menu
 kstart bash "$WINEPREFIX_PATH/winscr_menu.sh" &
