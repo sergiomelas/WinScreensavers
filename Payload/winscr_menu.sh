@@ -57,3 +57,5 @@ case $Choice in
     'Locking Screen Configuration') kstart bash "$WINEPREFIX_PATH/winscr_lock.sh" & ;;
     'About') kstart bash "$WINEPREFIX_PATH/winscr_about.sh" & ;;
 esac
+
+

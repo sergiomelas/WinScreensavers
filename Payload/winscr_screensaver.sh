@@ -60,8 +60,9 @@ trigger_cmd() {
 
             while true; do
                 sleep 1
-                # Exit if User Active (< 1.5s idle) or Monitor Off
-                if [ "$(xprintidle)" -lt 1500 ] || [[ "$(xset q)" == *"Monitor is Off"* ]] || ! kill -0 "$WINE_PID" 2>/dev/null; then
+                # Improved detection: Check if monitor is NOT "On" (covers Standby, Suspend, Off)
+                MON_STATUS=$(xset q | grep "Monitor is" | awk '{print $NF}')
+                if [ "$(xprintidle)" -lt 1500 ] || [[ "$MON_STATUS" != "On" ]] || ! kill -0 "$WINE_PID" 2>/dev/null; then
                     kill -9 "$WINE_PID" 2>/dev/null
                     break
                 fi
@@ -87,7 +88,9 @@ trigger_cmd() {
                     sleep 1
                     get_cached_config "$WINEPREFIX_PATH/random_period.conf" "60" "CURRENT_PERIOD"
 
-                    if [ "$(xprintidle)" -lt 1500 ] || [[ "$(xset q)" == *"Monitor is Off"* ]] || ! kill -0 "$NEW_PID" 2>/dev/null; then
+                    # Improved detection for Rotation Mode
+                    MON_STATUS=$(xset q | grep "Monitor is" | awk '{print $NF}')
+                    if [ "$(xprintidle)" -lt 1500 ] || [[ "$MON_STATUS" != "On" ]] || ! kill -0 "$NEW_PID" 2>/dev/null; then
                         USER_ACTIVE=true
                         break
                     fi
@@ -119,7 +122,6 @@ while true; do
     get_cached_config "$WINEPREFIX_PATH/timeout.conf" "60" "SCR_TIME"
     IDLE_LIMIT=$((SCR_TIME * 1000))
 
-    # Trigger only if IDLE and NOT immediately after a previous run
     if [ "$(xprintidle)" -ge "$IDLE_LIMIT" ]; then
         trigger_cmd
     fi

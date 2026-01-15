@@ -11,7 +11,6 @@ WINEPREFIX_PATH="/home/$USER/.winscr"
 CURRENT_PER=$(cat "$WINEPREFIX_PATH/random_period.conf" 2>/dev/null || echo "60")
 
 OPTIONS=(
-    "10 seconds" 10
     "30 seconds" 30
     "1 minute"   60
     "2 minutes"  120

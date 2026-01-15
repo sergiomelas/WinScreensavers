@@ -7,6 +7,10 @@ echo " #                     Configure screensaver                      #"
 echo " #       Developed for X11 & KDE Plasma by sergio melas 2026      #"
 echo " ##################################################################"
 
+# Set the Qt theme variable for this script and its child processes
+export QT_QPA_PLATFORMTHEME=qt6ct
+
+# Configure global paths
 WINEPREFIX_PATH="/home/$USER/.winscr"
 SCR_DIR="$WINEPREFIX_PATH/drive_c/windows/system32"
 RANDOM_CONF="$WINEPREFIX_PATH/random_list.conf"
@@ -35,7 +39,7 @@ if [[ "$SCR_SAVER" == "Random.scr" ]]; then
         kstart bash "$WINEPREFIX_PATH/winscr_menu.sh" &
         exit 1
     elif [ "$COUNT" -eq 1 ]; then
-        # LOGIC IMPROVEMENT: If only one item exists, pick it automatically
+        # If only one item exists, pick it automatically
         TARGET_SCR="${array[0]}"
     else
         # Multiple items: Show the Radiolist
@@ -61,9 +65,46 @@ else
     TARGET_SCR="$SCR_SAVER"
 fi
 
-# 3. Launch Wine Configuration
+# 3. Launch Wine Configuration with Hidden Centering
 if [[ -n "$TARGET_SCR" ]]; then
-    wine "$SCR_DIR/$TARGET_SCR" /c
+    # Launch in background
+    wine "$SCR_DIR/$TARGET_SCR" /c &
+    WINE_PID=$!
+
+    # Search for the window and center it invisibly
+    # Using a faster polling rate (0.2s) to catch the window before it draws
+    for i in {1..25}; do
+        sleep 0.2
+        # Find window ID associated with the wine process
+        WID=$(xdotool search --pid $WINE_PID --onlyvisible 2>/dev/null | tail -1)
+
+        if [ -n "$WID" ]; then
+            # 1. Instantly hide the window before it can be seen in the corner
+            xdotool windowunmap "$WID"
+
+            # 2. Get screen and window dimensions
+            SCREEN_WIDTH=$(xwininfo -root | grep 'Width:' | awk '{print $2}')
+            SCREEN_HEIGHT=$(xwininfo -root | grep 'Height:' | awk '{print $2}')
+
+            # Use xwininfo on the hidden ID to get its size
+            WIDTH=$(xwininfo -id "$WID" | grep 'Width:' | awk '{print $2}')
+            HEIGHT=$(xwininfo -id "$WID" | grep 'Height:' | awk '{print $2}')
+
+            # 3. Calculate center position
+            X=$(( (SCREEN_WIDTH - WIDTH) / 2 ))
+            Y=$(( (SCREEN_HEIGHT - HEIGHT) / 2 ))
+
+            # 4. Move the window while it is invisible
+            xdotool windowmove "$WID" "$X" "$Y"
+
+            # 5. Show the window now that it is centered
+            xdotool windowmap "$WID"
+            break
+        fi
+    done
+
+    # Wait for the configuration window to close before returning to menu
+    wait $WINE_PID
 fi
 
 # 4. Return to Menu
