@@ -14,7 +14,6 @@ echo " ##################################################################"
 WINEPREFIX_PATH="/home/$USER/.winscr"
 CURRENT_TIM=$(cat "$WINEPREFIX_PATH/timeout.conf" 2>/dev/null || echo "300")
 OPTIONS=(
-    "10 seconds" 10
     "30 seconds" 30
     "2 minutes"  120
     "5 minutes"  300
