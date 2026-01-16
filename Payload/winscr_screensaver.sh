@@ -1,5 +1,6 @@
 #!/bin/bash
 # filename: winscr_screensaver.sh
+# Improved version 2026 for X11 & KDE Plasma
 
 echo " "
 echo " ##################################################################"
@@ -8,7 +9,6 @@ echo " #       Developed for X11 & KDE Plasma by sergio melas 2026      #"
 echo " #                                                                #"
 echo " #                Email: sergiomelas@gmail.com                    #"
 echo " #                   Released under GPL V2.0                      #"
-echo " #                                                                #"
 echo " ##################################################################"
 
 WINEPREFIX_PATH="/home/$USER/.winscr"
@@ -16,7 +16,7 @@ SCR_DIR="$WINEPREFIX_PATH/drive_c/windows/system32"
 RANDOM_CONF="$WINEPREFIX_PATH/random_list.conf"
 export WINEPREFIX="$WINEPREFIX_PATH"
 export WINE_PROMPT_WOW64=0
-SCRIPT_PID=$$
+export WINEDEBUG=-all  # Reduces CPU overhead and logs
 
 # Efficient Refresh Function
 get_cached_config() {
@@ -34,9 +34,14 @@ get_cached_config() {
 }
 
 trigger_cmd() {
-    MedRun=$(pacmd list-sink-inputs 2>/dev/null | grep -c 'state: RUNNING')
+    # Modern Audio Detection (Checks both PipeWire and Pulse)
+    if command -v wpctl >/dev/null; then
+        MedRun=$(wpctl status | grep -A 5 "Streams" | grep -c "running")
+    else
+        MedRun=$(pacmd list-sink-inputs 2>/dev/null | grep -c 'state: RUNNING')
+    fi
+
     if [ "$MedRun" -eq '0' ]; then
-        # Clean start
         SCR_SAVER=$(cat "$WINEPREFIX_PATH/scrensaver.conf" 2>/dev/null || echo "Random.scr")
 
         VALID_ARRAY=()
@@ -54,23 +59,26 @@ trigger_cmd() {
         [[ ${#VALID_ARRAY[@]} -eq 0 ]] && return
 
         if [ "${#VALID_ARRAY[@]}" -eq 1 ]; then
+            # SINGLE MODE
             TARGET_SCR="${VALID_ARRAY[0]}"
             wine "$SCR_DIR/$TARGET_SCR" /s >/dev/null 2>&1 &
             WINE_PID=$!
 
             while true; do
-                sleep 1
-                # Improved detection: Check if monitor is NOT "On" (covers Standby, Suspend, Off)
+                sleep 0.5
                 MON_STATUS=$(xset q | grep "Monitor is" | awk '{print $NF}')
-                if [ "$(xprintidle)" -lt 1500 ] || [[ "$MON_STATUS" != "On" ]] || ! kill -0 "$WINE_PID" 2>/dev/null; then
-                    kill -9 "$WINE_PID" 2>/dev/null
+                if [ "$(xprintidle)" -lt 1200 ] || [[ "$MON_STATUS" != "On" ]] || ! kill -0 "$WINE_PID" 2>/dev/null; then
+                    kill "$WINE_PID" 2>/dev/null
                     break
                 fi
             done
         else
-            # ROTATION MODE
+            # ROTATION MODE (Fixed to fully kill loop on user activity)
             PREVIOUS_PID=""
             while true; do
+                # Safety check before starting a new one in the rotation
+                if [ "$(xprintidle)" -lt 1200 ]; then break; fi
+
                 CURRENT_SCR="${VALID_ARRAY[$(( RANDOM % ${#VALID_ARRAY[@]} ))]}"
                 wine "$SCR_DIR/$CURRENT_SCR" /s >/dev/null 2>&1 &
                 NEW_PID=$!
@@ -78,7 +86,7 @@ trigger_cmd() {
                 sleep 2
                 if ! kill -0 "$NEW_PID" 2>/dev/null; then continue; fi
 
-                [ -n "$PREVIOUS_PID" ] && kill -9 "$PREVIOUS_PID" 2>/dev/null
+                [ -n "$PREVIOUS_PID" ] && kill "$PREVIOUS_PID" 2>/dev/null
                 PREVIOUS_PID=$NEW_PID
 
                 USER_ACTIVE=false
@@ -88,9 +96,8 @@ trigger_cmd() {
                     sleep 1
                     get_cached_config "$WINEPREFIX_PATH/random_period.conf" "60" "CURRENT_PERIOD"
 
-                    # Improved detection for Rotation Mode
                     MON_STATUS=$(xset q | grep "Monitor is" | awk '{print $NF}')
-                    if [ "$(xprintidle)" -lt 1500 ] || [[ "$MON_STATUS" != "On" ]] || ! kill -0 "$NEW_PID" 2>/dev/null; then
+                    if [ "$(xprintidle)" -lt 1200 ] || [[ "$MON_STATUS" != "On" ]] || ! kill -0 "$NEW_PID" 2>/dev/null; then
                         USER_ACTIVE=true
                         break
                     fi
@@ -100,19 +107,22 @@ trigger_cmd() {
                 done
 
                 if $USER_ACTIVE; then
-                    kill -9 "$NEW_PID" 2>/dev/null
-                    break
+                    kill "$NEW_PID" 2>/dev/null
+                    break # Fully kills the rotation loop
                 fi
             done
         fi
 
-        # Cleanup Wine and Handle Locking
+        # Cleanup and Handle Locking
         wineserver -k 2>/dev/null
         LockSc=$(cat "$WINEPREFIX_PATH/lockscreen.conf" 2>/dev/null || echo "0")
-        SysLockSc=$(/usr/lib/qt6/bin/qdbus org.freedesktop.ScreenSaver /org/freedesktop/ScreenSaver GetActive)
-        [[ "$SysLockSc" == *"false"* ]] && [[ "$LockSc" -gt '0' ]] && loginctl lock-session
 
-        # COOLDOWN: Wait for idle to settle before returning to the main loop
+        # Plasma 6 / Qt6 DBus Check
+        SysLockSc=$(qdbus6 org.freedesktop.ScreenSaver /org/freedesktop/ScreenSaver GetActive 2>/dev/null || \
+                    qdbus org.freedesktop.ScreenSaver /org/freedesktop/ScreenSaver GetActive)
+
+        [[ "$SysLockSc" == "false" ]] && [[ "$LockSc" -gt '0' ]] && loginctl lock-session
+
         sleep 3
     fi
 }
@@ -122,8 +132,15 @@ while true; do
     get_cached_config "$WINEPREFIX_PATH/timeout.conf" "60" "SCR_TIME"
     IDLE_LIMIT=$((SCR_TIME * 1000))
 
-    if [ "$(xprintidle)" -ge "$IDLE_LIMIT" ]; then
+    CURRENT_IDLE=$(xprintidle)
+    if [ "$CURRENT_IDLE" -ge "$IDLE_LIMIT" ]; then
         trigger_cmd
     fi
-    sleep 2
+
+    # Adaptive polling: check more frequently if we are getting close to the timeout
+    if [ "$CURRENT_IDLE" -gt $((IDLE_LIMIT - 5000)) ]; then
+        sleep 1
+    else
+        sleep 3
+    fi
 done
