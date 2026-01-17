@@ -7,6 +7,10 @@ echo " #                        About screensaver                       #"
 echo " #       Developed for X11 & KDE Plasma by sergio melas 2026      #"
 echo " ##################################################################"
 
-zenity --info --timeout 5 --title="About" --text="Developed for X11 and KDE Plasma by sergio melas 2026"
 
-kstart bash "/home/$USER/.winscr/winscr_menu.sh" &
+WINEPREFIX_PATH="/home/$USER/.winscr"
+
+zenity --info --timeout 5 --title="About XScresavers" --text="Developed for X11 and KDE Plasma \n          (C) sergio melas 2026"
+rm -f "$WINEPREFIX_PATH"/.running  #Unlock istance
+kstart bash "$WINEPREFIX_PATH/winscr_menu.sh" &
+

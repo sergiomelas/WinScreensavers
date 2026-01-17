@@ -57,4 +57,5 @@ else
     echo "Selection canceled."
 fi
 
+rm -f "$WINEPREFIX_PATH"/.running  #Unlock istance
 kstart bash "$WINEPREFIX_PATH/winscr_menu.sh" &

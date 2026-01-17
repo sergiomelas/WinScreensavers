@@ -35,7 +35,8 @@ if [[ "$SCR_SAVER" == "Random.scr" ]]; then
     COUNT=${#array[@]}
 
     if [ "$COUNT" -eq 0 ]; then
-        zenity --error --text="No Windows screensavers found."
+        zenity --error --text="No Windows screensavers found. \n put them in $SCR_DIR"
+        rm -f "$WINEPREFIX_PATH"/.running  #Unlock istance
         kstart bash "$WINEPREFIX_PATH/winscr_menu.sh" &
         exit 1
     elif [ "$COUNT" -eq 1 ]; then
@@ -56,6 +57,7 @@ if [[ "$SCR_SAVER" == "Random.scr" ]]; then
 
         # If user cancels the menu
         if [[ -z "$TARGET_SCR" ]]; then
+            rm -f "$WINEPREFIX_PATH"/.running  #Unlock istance
             kstart bash "$WINEPREFIX_PATH/winscr_menu.sh" &
             exit 0
         fi
@@ -108,4 +110,5 @@ if [[ -n "$TARGET_SCR" ]]; then
 fi
 
 # 4. Return to Menu
+rm -f "$WINEPREFIX_PATH"/.running  #Unlock istance
 kstart bash "$WINEPREFIX_PATH/winscr_menu.sh" &

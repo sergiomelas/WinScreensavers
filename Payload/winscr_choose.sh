@@ -12,9 +12,11 @@ echo " #                                                                #"
 echo " ##################################################################"
 echo " "
 
-WINE_DIR="/home/$USER/.winscr/drive_c/windows/system32"
+
+WINEPREFIX_PATH="/home/$USER/.winscr"
+WINE_DIR="$WINEPREFIX_PATH/drive_c/windows/system32"
 # Read current config (e.g., "Random.scr" or "Mystify.scr")
-CURRENT_SCR=$(cat /home/$USER/.winscr/scrensaver.conf 2>/dev/null || echo "Random.scr")
+CURRENT_SCR=$(cat $WINEPREFIX_PATH=/scrensaver.conf 2>/dev/null || echo "Random.scr")
 
 # 1. Get the list of all .scr files
 readarray -t file_list < <(cd "$WINE_DIR" && ls *.scr)
@@ -53,9 +55,10 @@ if [ -n "$SCR" ]; then
     else
         FINAL_VAL="$SCR.scr"
     fi
-    echo "$FINAL_VAL" > /home/$USER/.winscr/scrensaver.conf
+    echo "$FINAL_VAL" > $WINEPREFIX_PATH/scrensaver.conf
     echo "Saved: $FINAL_VAL"
 fi
 
 # Reopen menu using modern KDE kstart
-kstart bash "/home/$USER/.winscr/winscr_menu.sh" &
+rm -f "$WINEPREFIX_PATH"/.running  #Unlock istance
+kstart bash "$WINEPREFIX_PATH/winscr_menu.sh" &

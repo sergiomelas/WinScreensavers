@@ -12,9 +12,10 @@ echo  " #                                                                #"
 echo  " ##################################################################"
 echo  " "
 
+WINEPREFIX_PATH="/home/$USER/.winscr"
 # Read current configuration
 # 0 = No (Disabled), 1 = Yes (Enabled)
-LockS=$( cat /home/$USER/.winscr/lockscreen.conf 2>/dev/null || echo "0" )
+LockS=$( cat $WINEPREFIX_PATH/lockscreen.conf 2>/dev/null || echo "0" )
 
 # Logic to set the radio buttons based on the config file
 if [ "$LockS" == "1" ]; then
@@ -37,6 +38,7 @@ LockScr=$(zenity --list --radiolist --title="Lock Screen Configuration" \
 if [ -z "$LockScr" ]; then
     # If user hits Cancel, do not change anything
     # Reopen the main menu using modern KDE kstart
+    rm -f "$WINEPREFIX_PATH"/.running  #Unlock istance
     kstart bash /home/$USER/.winscr/winscr_menu.sh &
 else
     if [ "$LockScr" == "Yes" ]; then
@@ -50,7 +52,9 @@ else
     # Save the choice back to the config file
     echo $LockVal > /home/$USER/.winscr/lockscreen.conf
     # Reopen the main menu using modern KDE kstart
+    rm -f "$WINEPREFIX_PATH"/.running  #Unlock istance
     kstart bash /home/$USER/.winscr/winscr_menu.sh &
 fi
+
 
 

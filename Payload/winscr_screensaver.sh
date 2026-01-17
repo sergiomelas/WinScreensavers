@@ -12,6 +12,9 @@ echo " #                   Released under GPL V2.0                      #"
 echo " ##################################################################"
 
 WINEPREFIX_PATH="/home/$USER/.winscr"
+
+rm -f "$WINEPREFIX_PATH"/.running  #Unlock istance
+
 SCR_DIR="$WINEPREFIX_PATH/drive_c/windows/system32"
 RANDOM_CONF="$WINEPREFIX_PATH/random_list.conf"
 export WINEPREFIX="$WINEPREFIX_PATH"

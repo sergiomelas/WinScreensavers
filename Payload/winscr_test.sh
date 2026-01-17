@@ -11,11 +11,13 @@ echo " #                   Released under GPL V2.0                      #"
 echo " #                                                                #"
 echo " ##################################################################"
 
-SCR_SAVER=$(cat /home/$USER/.winscr/scrensaver.conf)
-WINEPREFIX=/home/$USER/.winscr
+
+WINEPREFIX_PATH=/home/$USER/.winscr
+SCR_SAVER=$(cat $WINEPREFIX_PATH/scrensaver.conf)
 
 if [[ "$SCR_SAVER" != "Random.scr" ]]; then
-    wine "/home/$USER/.winscr/drive_c/windows/system32/$SCR_SAVER" /s
+    wine "$WINEPREFIX_PATH/drive_c/windows/system32/$SCR_SAVER" /s
 fi
 
+rm -f "$WINEPREFIX_PATH"/.running  #Unlock istance
 kstart bash "/home/$USER/.winscr/winscr_menu.sh" &
