@@ -2,6 +2,7 @@
 # filename: winscr_screensaver.sh
 # Final version 2026 for X11 & KDE Plasma 6
 
+
 # Display title block as a persistent header
 echo " "
 echo " ##################################################################"
@@ -18,14 +19,16 @@ echo "--- Service Started: $(date '+%Y-%m-%d %H:%M:%S') ---"
 # --- TERMINATION HANDLER ---
 cleanup_exit() {
     echo -e "\n[$(date +%H:%M:%S)] SHUTDOWN: Signal received. Cleaning up..."
+    # Kill the current wine screensaver process if it exists
     [[ -n "$NEW_PID" ]] && kill -9 "$NEW_PID" 2>/dev/null
-    [[ -n "$OLD_PID" ]] && kill -9 "$OLD_PID" 2>/dev/null
+    # Kill the wine server for this prefix specifically
     WINEPREFIX="/home/$USER/.winscr" wineboot -s 2>/dev/null
     exit 0
 }
 
 # Trap SIGTERM (shutdown/logout) and SIGINT (Ctrl+C)
 trap cleanup_exit SIGTERM SIGINT
+
 
 WINEPREFIX_PATH="/home/$USER/.winscr"
 rm -f "$WINEPREFIX_PATH"/.running
@@ -58,7 +61,7 @@ check_stop_conditions() {
         return 0
     fi
     local MON_STATUS=$(xset q | grep "Monitor is" | awk '{print $NF}')
-    if [[ "$MON_STATUS" == "Off" ]]; then
+    if [[ "$MON_STATUS" != "On" ]]; then
         STOP_REASON="Monitor turned off (DPMS)"
         return 0
     fi
@@ -88,6 +91,7 @@ is_video_engine_active() {
 
 trigger_cmd() {
     if is_video_engine_active; then
+        # Check if we already told the user about this video session
         if [ "$VIDEO_MSG_SENT" = false ]; then
             echo -e "\n[$(date +%H:%M:%S)] STATUS: Video Engine Active. Screensaver Inhibited."
             VIDEO_MSG_SENT=true
@@ -95,6 +99,7 @@ trigger_cmd() {
         return;
     fi
 
+    # Reset the toggle if video stops so it can print again for the next video
     VIDEO_MSG_SENT=false
 
     SCR_SAVER=$(cat "$WINEPREFIX_PATH/scrensaver.conf" 2>/dev/null || echo "Random.scr")
@@ -111,23 +116,16 @@ trigger_cmd() {
     fi
     [[ ${#VALID_ARRAY[@]} -eq 0 ]] && return
 
-    OLD_PID=""
+    PREVIOUS_PID=""
     while true; do
         if check_stop_conditions; then break; fi
 
         CURRENT_SCR="${VALID_ARRAY[$(( RANDOM % ${#VALID_ARRAY[@]} ))]}"
-        echo -e "\n[$(date +%H:%M:%S)] Starting $CURRENT_SCR..."
+        echo -e "\n[$(date +%H:%M:%S)] Starting $CURRENT_SCR in Wine..."
 
-        # --- SILENT LAUNCH ---
-        # Redirecting and disowning prevents Bash from printing "Killed" messages
         wine "$SCR_DIR/$CURRENT_SCR" /s >/dev/null 2>&1 &
         NEW_PID=$!
-        disown $NEW_PID 2>/dev/null
-
-        # Cross-fade logic
-        sleep 1
-        [[ -n "$OLD_PID" ]] && kill -9 "$OLD_PID" 2>/dev/null
-        sleep 1
+        sleep 2
 
         START_TIME=$(date +%s)
         USER_STOP=false
@@ -151,13 +149,11 @@ trigger_cmd() {
         done
 
         if $USER_STOP; then
-            echo -e "\n[$(date +%H:%M:%S)] CLEANUP: $STOP_REASON."
+            echo -e "\n[$(date +%H:%M:%S)] CLEANUP: $STOP_REASON. Terminating Wine environment."
             kill -9 "$NEW_PID" 2>/dev/null
-            WINEPREFIX="$WINEPREFIX_PATH" wineboot -s 2>/dev/null
+            wineserver -k 2>/dev/null
             break
         fi
-
-        OLD_PID="$NEW_PID"
     done
 }
 
@@ -170,7 +166,9 @@ while true; do
     if [ "$CURRENT_IDLE" -ge "$IDLE_LIMIT" ]; then
         trigger_cmd
     else
+        # Reset the message toggle when user is active so it works the next time they go idle
         VIDEO_MSG_SENT=false
+
         REMAINING_IDLE=$(( (IDLE_LIMIT - CURRENT_IDLE) / 1000 ))
         [ "$REMAINING_IDLE" -lt 0 ] && REMAINING_IDLE=0
         printf "\r[IDLE MONITOR] Screensaver starting in: %02d seconds... " "$REMAINING_IDLE"
@@ -178,3 +176,5 @@ while true; do
 
     sleep 1
 done
+
+
