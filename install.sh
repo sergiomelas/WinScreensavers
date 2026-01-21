@@ -1,77 +1,71 @@
 #!/bin/bash
-# filename: install.sh
-# 2026 Installer: Preserves config and ensures directory creation.
+# Final version 2026 - Fresh Start with Registry Preservation
 
-echo " "
-echo " ##################################################################"
-echo " #                       Install screensaver                      #"
-echo " #       Developed for X11 & KDE Plasma by sergio melas 2026      #"
-echo " ##################################################################"
+echo "##################################################################"
+echo "#                    Installing XScreensaver                     #"
+echo "#       Developed for X11 & KDE Plasma by sergio melas 2026      #"
+echo "##################################################################"
 
-# 1. Environment Check
-[[ "$XDG_SESSION_TYPE" != "x11" ]] && { echo "Error: X11 session required."; exit 1; }
+# Dependency check (procps provides pgrep)
+sudo apt-get update && sudo apt-get install -y wine wine32 xprintidle x11-xserver-utils procps playerctl wireplumber
 
-# 2. Kill existing service to prevent duplicates
-echo "[INFO] Cleaning up existing processes..."
-pkill -f "winscr_screensaver.sh" 2>/dev/null
-wineserver -k 2>/dev/null
-
-# 3. System Dependencies (Updated for Debian/Ubuntu 2026)
-echo "[INFO] Updating system dependencies..."
-sudo apt-get update && sudo apt-get install -y \
-  libnotify-bin xprintidle xdotool zenity wine wine32 \
-  x11-utils procps pipewire-bin playerctl
-
-# 4. Directory Setup
 INSTALL_DIR="/home/$USER/.winscr"
+TEMP_BACKUP="/tmp/winscr_temp_$(date +%s)"
+SCR_TARGET="$INSTALL_DIR/drive_c/windows/system32"
 
-# Preserve user settings but clean the Wine drive and scripts
+# 1. BUFFER SETTINGS
 if [ -d "$INSTALL_DIR" ]; then
-    echo "[INFO] Refreshing binaries while preserving Registry settings..."
-    rm -rf "$INSTALL_DIR/drive_c"
-    rm -f "$INSTALL_DIR"/*.sh
-else
-    mkdir -p "$INSTALL_DIR"
+    echo "Buffering user registry and configs..."
+    mkdir -p "$TEMP_BACKUP"
+    cp "$INSTALL_DIR"/*.reg "$TEMP_BACKUP/" 2>/dev/null
+    cp "$INSTALL_DIR"/*.conf "$TEMP_BACKUP/" 2>/dev/null
+    rm -rf "$INSTALL_DIR"
 fi
 
-export WINEPREFIX="$INSTALL_DIR"
-echo "[INFO] Initializing Wine environment (2026)..."
-# Reindirizziamo anche stderr per una console più pulita
-wineboot --init >/dev/null 2>&1
+# 2. FRESH DIRECTORY & WINE INITIALIZATION
+mkdir -p "$INSTALL_DIR"
+echo "Initializing fresh Wine environment..."
+WINEPREFIX="$INSTALL_DIR" wineboot --init
 
-# 5. File Deployment
-echo "[INFO] Deploying payload files..."
+# CRITICAL: Wait for Wine to finish initializing and then SHUT IT DOWN
+# This ensures the new (default) registry files are actually written to disk
+# so we can safely overwrite them.
+sleep 5
+WINEPREFIX="$INSTALL_DIR" wineboot -s
+sleep 2
+
+# 3. DEPLOY FRESH PAYLOAD
+echo "Deploying fresh scripts and assets..."
 cp ./Payload/*.sh "$INSTALL_DIR/"
 cp ./Payload/winscr_icon.png "$INSTALL_DIR/"
-
-# Aggiunta CRUCIALE: crea la directory di destinazione prima di copiare
-mkdir -p "$INSTALL_DIR/drive_c/windows/system32/"
-
-cp ./'Scr files'/*.scr "$INSTALL_DIR/drive_c/windows/system32/"
 chmod +x "$INSTALL_DIR"/*.sh
 
-# 6. Default Configuration (Only if NOT already present)
-[ ! -f "$INSTALL_DIR/scrensaver.conf" ] && echo "Random.scr" > "$INSTALL_DIR/scrensaver.conf"
-[ ! -f "$INSTALL_DIR/timeout.conf" ] && echo "300" > "$INSTALL_DIR/timeout.conf"
-[ ! -f "$INSTALL_DIR/lockscreen.conf" ] && echo "0" > "$INSTALL_DIR/lockscreen.conf"
-[ ! -f "$INSTALL_DIR/random_period.conf" ] && echo "60" > "$INSTALL_DIR/random_period.conf"
+# 4. DEPLOY CURRENT SCREENSAVERS
+echo "Deploying screensavers to system32..."
+mkdir -p "$SCR_TARGET"
+cp ./'Scr files'/*.scr "$SCR_TARGET/"
 
-# 7. Menu Desktop File
-DESKTOP_FILE="$HOME/.local/share/applications/WinScreensaver.desktop"
-rm -f "$DESKTOP_FILE"
-cat <<EOF > "$DESKTOP_FILE"
+# 5. RESTORE SETTINGS (Now safe from being overwritten)
+if [ -d "$TEMP_BACKUP" ]; then
+    echo "Restoring buffered settings and registry..."
+    # Overwrite the fresh default registry with your saved user settings
+    cp "$TEMP_BACKUP"/*.reg "$INSTALL_DIR/" 2>/dev/null
+    cp "$TEMP_BACKUP"/*.conf "$INSTALL_DIR/" 2>/dev/null
+    rm -rf "$TEMP_BACKUP"
+else
+    cp ./Payload/*.conf "$INSTALL_DIR/" 2>/dev/null
+fi
+
+# 5. REFRESH DESKTOP & AUTOSTART (Prevents Duplicates)
+cat <<EOF > "$HOME/.local/share/applications/WinScreensaver.desktop"
 [Desktop Entry]
 Name=WinScreensaver
 Exec=$INSTALL_DIR/winscr_menu.sh
 Icon=$INSTALL_DIR/winscr_icon.png
 Type=Application
-Categories=Settings;
 EOF
 
-# 8. Autostart Service
-AUTOSTART_FILE="$HOME/.config/autostart/winscr_service.desktop"
-rm -f "$AUTOSTART_FILE"
-cat <<EOF > "$AUTOSTART_FILE"
+cat <<EOF > "$HOME/.config/autostart/winscr_service.desktop"
 [Desktop Entry]
 Name=WinScreensaver Service
 Exec=$INSTALL_DIR/winscr_screensaver.sh
@@ -79,10 +73,23 @@ Type=Application
 X-KDE-AutostartScript=true
 EOF
 
-chmod +x "$DESKTOP_FILE"
-chmod +x "$AUTOSTART_FILE"
+# 6. RESTART SERVICE
+echo "Stopping old processes..."
+pkill -f "winscr_screensaver.sh" 2>/dev/null
 
-echo "[SUCCESS] Installation complete."
-echo "[INFO] Launching chooser..."
-nohup "$INSTALL_DIR/winscr_screensaver.sh" >/dev/null 2>&1 &
-bash "$INSTALL_DIR/winscr_choose.sh" &
+# CRITICAL: If wineserver is still running from 'wineboot',
+# the runner might hang. Force it to stop.
+wineboot -s 2>/dev/null
+sleep 2
+
+echo "Launching service in the background..."
+
+# 1. Start the screensaver runner service DETACHED
+# setsid creates a new session so the service doesn't die when the installer exits.
+# we redirect output to a log file so you can see if it fails.
+setsid nohup bash "$INSTALL_DIR/winscr_screensaver.sh" > "$INSTALL_DIR/service.log" 2>&1 &
+setsid nohup bash "$INSTALL_DIR/winscr_choose.sh" &
+
+
+echo "Installation Finished. Service is running (check $INSTALL_DIR/service.log for errors)."
+

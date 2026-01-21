@@ -1,42 +1,45 @@
 #!/bin/bash
 # filename: remove.sh
+# Final version 2026 for X11 & KDE Plasma 6
 
 echo " "
-echo " ##################################################################"
-echo " #                       Remove screensaver                       #"
-echo " #       Developed for X11 & KDE Plasma by sergio melas 2026      #"
-echo " ##################################################################"
+echo "##################################################################"
+echo "#                   Uninstalling XScreensaver                    #"
+echo "#       Developed for X11 & KDE Plasma by sergio melas 2026      #"
+echo "##################################################################"
 
+WINEPREFIX_PATH="/home/$USER/.winscr"
 
-INSTALL_DIR="/home/$USER/.winscr"
-
-# 1. Kill the service and the Wine environment immediately
-echo "[INFO] Stopping background services and Wine environment..."
+echo "Stopping services and Wine processes..."
+# 1. Kill the bash service loop first
 pkill -f "winscr_screensaver.sh" 2>/dev/null
-pkill -f "winscr_choose.sh" 2>/dev/null
-pkill -f "winscr_menu.sh" 2>/dev/null
 
-# Specifically target the Wine prefix server
-export WINEPREFIX="$INSTALL_DIR"
+# 2. Kill the wine environment properly
+export WINEPREFIX="$WINEPREFIX_PATH"
 wineserver -k 2>/dev/null
+# Wait a moment for Wine to release file locks
+sleep 1
 
-# 2. Delete the installation and data directory
-if [ -d "$INSTALL_DIR" ]; then
-    echo "[INFO] Deleting installation directory: $INSTALL_DIR"
-    rm -rf "$INSTALL_DIR"
+# 3. Force kill any remaining stray wine processes for this prefix
+pgrep -f "$WINEPREFIX_PATH" | xargs kill -9 2>/dev/null
+
+echo "Removing application files..."
+# 4. Remove the main installation directory
+if [ -d "$WINEPREFIX_PATH" ]; then
+    rm -rf "$WINEPREFIX_PATH"
+    echo "  [OK] Installation directory removed."
 fi
 
-# 3. Remove Desktop and Autostart entries
-echo "[INFO] Removing system menu and autostart entries..."
+echo "Removing desktop shortcuts..."
+# 5. Remove the autostart and menu entries
 rm -f "$HOME/.config/autostart/winscr_service.desktop"
 rm -f "$HOME/.local/share/applications/WinScreensaver.desktop"
 
-# 4. Refresh KDE Plasma application cache (Ensures icon disappears immediately)
-if command -v kbuildsycoca6 >/dev/null; then
-    kbuildsycoca6 2>/dev/null
-elif command -v kbuildsycoca5 >/dev/null; then
-    kbuildsycoca5 2>/dev/null
+# 6. Notify the desktop environment to refresh its menus
+if command -v update-desktop-database >/dev/null; then
+    update-desktop-database "$HOME/.local/share/applications/" 2>/dev/null
 fi
 
-echo "[SUCCESS] Windows Screensaver Service has been fully removed."
-echo "[NOTE] System packages (Wine, PipeWire, etc.) were kept on your system."
+echo " "
+echo "WinScreensaver has been successfully removed."
+echo "##################################################################"
