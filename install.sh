@@ -1,6 +1,6 @@
 #!/bin/bash
 # filename: install.sh
-# 2026 Installer: Preserves config, Registry settings, and prevents duplicate services.
+# 2026 Installer: Preserves config and ensures directory creation.
 
 echo " "
 echo " ##################################################################"
@@ -25,9 +25,9 @@ sudo apt-get update && sudo apt-get install -y \
 # 4. Directory Setup
 INSTALL_DIR="/home/$USER/.winscr"
 
+# Preserve user settings but clean the Wine drive and scripts
 if [ -d "$INSTALL_DIR" ]; then
     echo "[INFO] Refreshing binaries while preserving Registry settings..."
-    # We remove the drive and scripts, but NOT the .reg files or .conf files
     rm -rf "$INSTALL_DIR/drive_c"
     rm -f "$INSTALL_DIR"/*.sh
 else
@@ -36,12 +36,17 @@ fi
 
 export WINEPREFIX="$INSTALL_DIR"
 echo "[INFO] Initializing Wine environment (2026)..."
+# Reindirizziamo anche stderr per una console più pulita
 wineboot --init >/dev/null 2>&1
 
 # 5. File Deployment
 echo "[INFO] Deploying payload files..."
 cp ./Payload/*.sh "$INSTALL_DIR/"
 cp ./Payload/winscr_icon.png "$INSTALL_DIR/"
+
+# Aggiunta CRUCIALE: crea la directory di destinazione prima di copiare
+mkdir -p "$INSTALL_DIR/drive_c/windows/system32/"
+
 cp ./'Scr files'/*.scr "$INSTALL_DIR/drive_c/windows/system32/"
 chmod +x "$INSTALL_DIR"/*.sh
 
@@ -78,6 +83,6 @@ chmod +x "$DESKTOP_FILE"
 chmod +x "$AUTOSTART_FILE"
 
 echo "[SUCCESS] Installation complete."
-echo "[INFO] Launching service..."
+echo "[INFO] Launching chooser..."
 nohup "$INSTALL_DIR/winscr_screensaver.sh" >/dev/null 2>&1 &
 bash "$INSTALL_DIR/winscr_choose.sh" &
