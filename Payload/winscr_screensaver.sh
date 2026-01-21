@@ -1,7 +1,9 @@
 #!/bin/bash
 # filename: winscr_screensaver.sh
-# Improved version 2026 for X11 & KDE Plasma
+# Final version 2026 for X11 & KDE Plasma 6
 
+
+# Display title block as a persistent header
 echo " "
 echo " ##################################################################"
 echo " #                 Windows screensavers launcher                  #"
@@ -10,24 +12,28 @@ echo " #                                                                #"
 echo " #                Email: sergiomelas@gmail.com                    #"
 echo " #                   Released under GPL V2.0                      #"
 echo " ##################################################################"
+echo " "
+echo "--- Service Started: $(date '+%Y-%m-%d %H:%M:%S') ---"
+
+
 
 WINEPREFIX_PATH="/home/$USER/.winscr"
-
-rm -f "$WINEPREFIX_PATH"/.running  #Unlock istance
-
+rm -f "$WINEPREFIX_PATH"/.running
 SCR_DIR="$WINEPREFIX_PATH/drive_c/windows/system32"
 RANDOM_CONF="$WINEPREFIX_PATH/random_list.conf"
 export WINEPREFIX="$WINEPREFIX_PATH"
 export WINE_PROMPT_WOW64=0
-export WINEDEBUG=-all  # Reduces CPU overhead and logs
+export WINEDEBUG=-all
 
-# Efficient Refresh Function
+# Toggle variable to prevent spamming logs
+VIDEO_MSG_SENT=false
+
 get_cached_config() {
     local file="$1"
     local default="$2"
     local var_name="$3"
-    local mtime_var="LAST_MTIME_${var_name}"
     local current_mtime=$(stat -c %Y "$file" 2>/dev/null || echo 0)
+    local mtime_var="LAST_MTIME_${var_name}"
 
     if [[ "$current_mtime" != "${!mtime_var}" ]]; then
         local value=$(cat "$file" 2>/dev/null || echo "$default")
@@ -36,114 +42,126 @@ get_cached_config() {
     fi
 }
 
-trigger_cmd() {
-    # Modern Audio Detection (Checks both PipeWire and Pulse)
+check_stop_conditions() {
+    if [ "$(xprintidle)" -lt 1200 ]; then
+        STOP_REASON="User activity detected"
+        return 0
+    fi
+    local MON_STATUS=$(xset q | grep "Monitor is" | awk '{print $NF}')
+    if [[ "$MON_STATUS" != "On" ]]; then
+        STOP_REASON="Monitor turned off (DPMS)"
+        return 0
+    fi
+    local SysLockSc=$(qdbus6 org.freedesktop.ScreenSaver /org/freedesktop/ScreenSaver GetActive 2>/dev/null || \
+                    qdbus org.freedesktop.ScreenSaver /org/freedesktop/ScreenSaver GetActive 2>/dev/null)
+    if [[ "$SysLockSc" == "true" ]]; then
+        STOP_REASON="System Lock detected"
+        return 0
+    fi
+    return 1
+}
+
+is_video_engine_active() {
+    if command -v pw-dump >/dev/null; then
+        local VideoActive=$(pw-dump | grep -E "media.class.*Video" -B 20 | grep -c "running")
+        if [ "$VideoActive" -gt 0 ]; then return 0; fi
+    fi
+    if command -v playerctl >/dev/null; then
+        if playerctl status 2>/dev/null | grep -q "Playing"; then return 0; fi
+    fi
     if command -v wpctl >/dev/null; then
-        MedRun=$(wpctl status | grep -A 5 "Streams" | grep -c "running")
+        local AudioRun=$(wpctl status | sed -n '/Streams:/,/^$/p' | grep -c "running")
+        if [ "$AudioRun" -gt 0 ]; then return 0; fi
+    fi
+    return 1
+}
+
+trigger_cmd() {
+    if is_video_engine_active; then
+        # Check if we already told the user about this video session
+        if [ "$VIDEO_MSG_SENT" = false ]; then
+            echo -e "\n[$(date +%H:%M:%S)] STATUS: Video Engine Active. Screensaver Inhibited."
+            VIDEO_MSG_SENT=true
+        fi
+        return;
+    fi
+
+    # Reset the toggle if video stops so it can print again for the next video
+    VIDEO_MSG_SENT=false
+
+    SCR_SAVER=$(cat "$WINEPREFIX_PATH/scrensaver.conf" 2>/dev/null || echo "Random.scr")
+    VALID_ARRAY=()
+    if [[ "$SCR_SAVER" == "Random.scr" ]]; then
+        if [[ -s "$RANDOM_CONF" ]]; then
+            readarray -t temp_array < "$RANDOM_CONF"
+            for f in "${temp_array[@]}"; do [[ -f "$SCR_DIR/$f" ]] && VALID_ARRAY+=("$f"); done
+        else
+            readarray -t VALID_ARRAY < <(find "$SCR_DIR" -maxdepth 1 -name "*.scr" -printf "%f\n")
+        fi
     else
-        MedRun=$(pacmd list-sink-inputs 2>/dev/null | grep -c 'state: RUNNING')
+        [[ -f "$SCR_DIR/$SCR_SAVER" ]] && VALID_ARRAY+=("$SCR_SAVER")
     fi
+    [[ ${#VALID_ARRAY[@]} -eq 0 ]] && return
 
-    if [ "$MedRun" -eq '0' ]; then
-        SCR_SAVER=$(cat "$WINEPREFIX_PATH/scrensaver.conf" 2>/dev/null || echo "Random.scr")
+    PREVIOUS_PID=""
+    while true; do
+        if check_stop_conditions; then break; fi
 
-        VALID_ARRAY=()
-        if [[ "$SCR_SAVER" == "Random.scr" ]]; then
-            if [[ -s "$RANDOM_CONF" ]]; then
-                readarray -t temp_array < "$RANDOM_CONF"
-                for f in "${temp_array[@]}"; do [[ -f "$SCR_DIR/$f" ]] && VALID_ARRAY+=("$f"); done
-            else
-                readarray -t VALID_ARRAY < <(find "$SCR_DIR" -maxdepth 1 -name "*.scr" -printf "%f\n")
+        CURRENT_SCR="${VALID_ARRAY[$(( RANDOM % ${#VALID_ARRAY[@]} ))]}"
+        echo -e "\n[$(date +%H:%M:%S)] Starting $CURRENT_SCR in Wine..."
+
+        wine "$SCR_DIR/$CURRENT_SCR" /s >/dev/null 2>&1 &
+        NEW_PID=$!
+        sleep 2
+
+        START_TIME=$(date +%s)
+        USER_STOP=false
+
+        while true; do
+            sleep 0.2
+            get_cached_config "$WINEPREFIX_PATH/random_period.conf" "60" "CURRENT_PERIOD"
+
+            if check_stop_conditions || is_video_engine_active || ! kill -0 "$NEW_PID" 2>/dev/null; then
+                USER_STOP=true
+                break
             fi
-        else
-            [[ -f "$SCR_DIR/$SCR_SAVER" ]] && VALID_ARRAY+=("$SCR_SAVER")
+
+            NOW=$(date +%s)
+            if [ ${#VALID_ARRAY[@]} -gt 1 ]; then
+                ELAPSED=$(( NOW - START_TIME ))
+                REMAINING=$(( CURRENT_PERIOD - ELAPSED ))
+                printf "\r    >> Rotation: %02d seconds remaining... " "$REMAINING"
+                [[ $ELAPSED -ge "$CURRENT_PERIOD" ]] && { echo ""; break; }
+            fi
+        done
+
+        if $USER_STOP; then
+            echo -e "\n[$(date +%H:%M:%S)] CLEANUP: $STOP_REASON. Terminating Wine environment."
+            kill -9 "$NEW_PID" 2>/dev/null
+            wineserver -k 2>/dev/null
+            break
         fi
-
-        [[ ${#VALID_ARRAY[@]} -eq 0 ]] && return
-
-        if [ "${#VALID_ARRAY[@]}" -eq 1 ]; then
-            # SINGLE MODE
-            TARGET_SCR="${VALID_ARRAY[0]}"
-            wine "$SCR_DIR/$TARGET_SCR" /s >/dev/null 2>&1 &
-            WINE_PID=$!
-
-            while true; do
-                sleep 0.5
-                MON_STATUS=$(xset q | grep "Monitor is" | awk '{print $NF}')
-                if [ "$(xprintidle)" -lt 1200 ] || [[ "$MON_STATUS" != "On" ]] || ! kill -0 "$WINE_PID" 2>/dev/null; then
-                    kill "$WINE_PID" 2>/dev/null
-                    break
-                fi
-            done
-        else
-            # ROTATION MODE (Fixed to fully kill loop on user activity)
-            PREVIOUS_PID=""
-            while true; do
-                # Safety check before starting a new one in the rotation
-                if [ "$(xprintidle)" -lt 1200 ]; then break; fi
-
-                CURRENT_SCR="${VALID_ARRAY[$(( RANDOM % ${#VALID_ARRAY[@]} ))]}"
-                wine "$SCR_DIR/$CURRENT_SCR" /s >/dev/null 2>&1 &
-                NEW_PID=$!
-
-                sleep 2
-                if ! kill -0 "$NEW_PID" 2>/dev/null; then continue; fi
-
-                [ -n "$PREVIOUS_PID" ] && kill "$PREVIOUS_PID" 2>/dev/null
-                PREVIOUS_PID=$NEW_PID
-
-                USER_ACTIVE=false
-                START_TIME=$(date +%s)
-
-                while true; do
-                    sleep 1
-                    get_cached_config "$WINEPREFIX_PATH/random_period.conf" "60" "CURRENT_PERIOD"
-
-                    MON_STATUS=$(xset q | grep "Monitor is" | awk '{print $NF}')
-                    if [ "$(xprintidle)" -lt 1200 ] || [[ "$MON_STATUS" != "On" ]] || ! kill -0 "$NEW_PID" 2>/dev/null; then
-                        USER_ACTIVE=true
-                        break
-                    fi
-
-                    NOW=$(date +%s)
-                    [[ $(( NOW - START_TIME )) -ge "$CURRENT_PERIOD" ]] && break
-                done
-
-                if $USER_ACTIVE; then
-                    kill "$NEW_PID" 2>/dev/null
-                    break # Fully kills the rotation loop
-                fi
-            done
-        fi
-
-        # Cleanup and Handle Locking
-        wineserver -k 2>/dev/null
-        LockSc=$(cat "$WINEPREFIX_PATH/lockscreen.conf" 2>/dev/null || echo "0")
-
-        # Plasma 6 / Qt6 DBus Check
-        SysLockSc=$(qdbus6 org.freedesktop.ScreenSaver /org/freedesktop/ScreenSaver GetActive 2>/dev/null || \
-                    qdbus org.freedesktop.ScreenSaver /org/freedesktop/ScreenSaver GetActive)
-
-        [[ "$SysLockSc" == "false" ]] && [[ "$LockSc" -gt '0' ]] && loginctl lock-session
-
-        sleep 3
-    fi
+    done
 }
 
 # MAIN SERVICE LOOP
 while true; do
     get_cached_config "$WINEPREFIX_PATH/timeout.conf" "60" "SCR_TIME"
     IDLE_LIMIT=$((SCR_TIME * 1000))
-
     CURRENT_IDLE=$(xprintidle)
+
     if [ "$CURRENT_IDLE" -ge "$IDLE_LIMIT" ]; then
         trigger_cmd
+    else
+        # Reset the message toggle when user is active so it works the next time they go idle
+        VIDEO_MSG_SENT=false
+
+        REMAINING_IDLE=$(( (IDLE_LIMIT - CURRENT_IDLE) / 1000 ))
+        [ "$REMAINING_IDLE" -lt 0 ] && REMAINING_IDLE=0
+        printf "\r[IDLE MONITOR] Screensaver starting in: %02d seconds... " "$REMAINING_IDLE"
     fi
 
-    # Adaptive polling: check more frequently if we are getting close to the timeout
-    if [ "$CURRENT_IDLE" -gt $((IDLE_LIMIT - 5000)) ]; then
-        sleep 1
-    else
-        sleep 3
-    fi
+    sleep 1
 done
+
+
