@@ -1,8 +1,9 @@
 #!/bin/bash
 # filename: winscr_screensaver.sh
 # Final version 2026 for X11 & KDE Plasma 6
+# Features: Application Timer, Video Reset, Lock-Detection Fix, and Status Messaging
 
-# Display title block as a persistent header
+# Display title block
 echo " "
 echo " ##################################################################"
 echo " #                 Windows screensavers launcher                  #"
@@ -14,7 +15,6 @@ echo " ##################################################################"
 echo " "
 echo "--- Service Started: $(date '+%Y-%m-%d %H:%M:%S') ---"
 
-
 # --- TERMINATION HANDLER ---
 cleanup_exit() {
     echo -e "\n[$(date +%H:%M:%S)] SHUTDOWN: Signal received. Cleaning up..."
@@ -24,80 +24,52 @@ cleanup_exit() {
     exit 0
 }
 
-# Trap SIGTERM (shutdown/logout) and SIGINT (Ctrl+C)
 trap cleanup_exit SIGTERM SIGINT
 
 WINEPREFIX_PATH="/home/$USER/.winscr"
-rm -f "$WINEPREFIX_PATH"/.running
 SCR_DIR="$WINEPREFIX_PATH/drive_c/windows/system32"
 RANDOM_CONF="$WINEPREFIX_PATH/random_list.conf"
 export WINEPREFIX="$WINEPREFIX_PATH"
 export WINE_PROMPT_WOW64=0
 export WINEDEBUG=-all
 
-# Toggle variable to prevent spamming logs
-VIDEO_MSG_SENT=false
+# Internal Application Timer
+APP_TIMER=0
 
 get_cached_config() {
     local file="$1"
     local default="$2"
-    local var_name="$3"
-    local current_mtime=$(stat -c %Y "$file" 2>/dev/null || echo 0)
-    local mtime_var="LAST_MTIME_${var_name}"
-
-    if [[ "$current_mtime" != "${!mtime_var}" ]]; then
-        local value=$(cat "$file" 2>/dev/null || echo "$default")
-        eval "${var_name}=\"$value\""
-        eval "${mtime_var}=\"$current_mtime\""
+    if [[ -f "$file" ]]; then
+        cat "$file"
+    else
+        echo "$default"
     fi
 }
 
-check_stop_conditions() {
-    if [ "$(xprintidle)" -lt 1200 ]; then
-        STOP_REASON="User activity detected"
-        return 0
-    fi
-    local MON_STATUS=$(xset q | grep "Monitor is" | awk '{print $NF}')
-    if [[ "$MON_STATUS" == "Off" ]]; then
-        STOP_REASON="Monitor turned off (DPMS)"
-        return 0
-    fi
-    local SysLockSc=$(qdbus6 org.freedesktop.ScreenSaver /org/freedesktop/ScreenSaver GetActive 2>/dev/null || \
-                    qdbus org.freedesktop.ScreenSaver /org/freedesktop/ScreenSaver GetActive 2>/dev/null)
-    if [[ "$SysLockSc" == "true" ]]; then
-        STOP_REASON="System Lock detected"
-        return 0
-    fi
+is_screen_locked() {
+    # Detects if KDE Plasma lock screen is active
+    local locked=$(qdbus6 org.freedesktop.ScreenSaver /org/freedesktop/ScreenSaver GetActive 2>/dev/null || \
+                   qdbus org.freedesktop.ScreenSaver /org/freedesktop/ScreenSaver GetActive 2>/dev/null)
+    if [[ "$locked" == "true" ]]; then return 0; fi
     return 1
 }
 
 is_video_engine_active() {
+    # 1. D-Bus Inhibit (Browsers/YouTube)
+    local dbus_inhibit=$(qdbus6 org.freedesktop.PowerManagement.Inhibit /org/freedesktop/PowerManagement/Inhibit HasInhibit 2>/dev/null || \
+                         qdbus org.freedesktop.PowerManagement.Inhibit /org/freedesktop/PowerManagement/Inhibit HasInhibit 2>/dev/null)
+    if [[ "$dbus_inhibit" == "true" ]]; then return 0; fi
+
+    # 2. Pipewire Node Check (Targeting browsers/media players)
     if command -v pw-dump >/dev/null; then
-        local VideoActive=$(pw-dump | grep -E "media.class.*Video" -B 20 | grep -c "running")
+        local VideoActive=$(pw-dump | grep -E "node.name.*(firefox|chrome|brave|vlc|mpv)" -A 15 | grep -c "running")
         if [ "$VideoActive" -gt 0 ]; then return 0; fi
-    fi
-    if command -v playerctl >/dev/null; then
-        if playerctl status 2>/dev/null | grep -q "Playing"; then return 0; fi
-    fi
-    if command -v wpctl >/dev/null; then
-        local AudioRun=$(wpctl status | sed -n '/Streams:/,/^$/p' | grep -c "running")
-        if [ "$AudioRun" -gt 0 ]; then return 0; fi
     fi
     return 1
 }
 
 trigger_cmd() {
-    if is_video_engine_active; then
-        if [ "$VIDEO_MSG_SENT" = false ]; then
-            echo -e "\n[$(date +%H:%M:%S)] STATUS: Video Engine Active. Screensaver Inhibited."
-            VIDEO_MSG_SENT=true
-        fi
-        return;
-    fi
-
-    VIDEO_MSG_SENT=false
-
-    SCR_SAVER=$(cat "$WINEPREFIX_PATH/scrensaver.conf" 2>/dev/null || echo "Random.scr")
+    SCR_SAVER=$(get_cached_config "$WINEPREFIX_PATH/scrensaver.conf" "Random.scr")
     VALID_ARRAY=()
     if [[ "$SCR_SAVER" == "Random.scr" ]]; then
         if [[ -s "$RANDOM_CONF" ]]; then
@@ -113,67 +85,100 @@ trigger_cmd() {
 
     OLD_PID=""
     while true; do
-        if check_stop_conditions; then break; fi
+        # Exit if user moves mouse or screen is locked
+        if [ "$(xprintidle)" -lt 1500 ] || is_screen_locked; then
+            break;
+        fi
 
         CURRENT_SCR="${VALID_ARRAY[$(( RANDOM % ${#VALID_ARRAY[@]} ))]}"
         echo -e "\n[$(date +%H:%M:%S)] Starting $CURRENT_SCR..."
 
-        # --- SILENT LAUNCH ---
-        # Redirecting and disowning prevents Bash from printing "Killed" messages
         wine "$SCR_DIR/$CURRENT_SCR" /s >/dev/null 2>&1 &
         NEW_PID=$!
         disown $NEW_PID 2>/dev/null
 
-        # Cross-fade logic
-        sleep 1
+        sleep 4
         [[ -n "$OLD_PID" ]] && kill -9 "$OLD_PID" 2>/dev/null
-        sleep 1
 
         START_TIME=$(date +%s)
         USER_STOP=false
 
         while true; do
-            sleep 0.2
-            get_cached_config "$WINEPREFIX_PATH/random_period.conf" "60" "CURRENT_PERIOD"
+            sleep 0.5
 
-            if check_stop_conditions || is_video_engine_active || ! kill -0 "$NEW_PID" 2>/dev/null; then
+            # CRITICAL: Kill saver if screen locks to allow password entry
+            if is_screen_locked; then
                 USER_STOP=true
+                STOP_REASON="System Locked"
                 break
             fi
 
-            NOW=$(date +%s)
-            if [ ${#VALID_ARRAY[@]} -gt 1 ]; then
-                ELAPSED=$(( NOW - START_TIME ))
-                REMAINING=$(( CURRENT_PERIOD - ELAPSED ))
-                printf "\r    >> Rotation: %02d seconds remaining... " "$REMAINING"
-                [[ $ELAPSED -ge "$CURRENT_PERIOD" ]] && { echo ""; break; }
+            # Monitor physical activity
+            if [ "$(xprintidle)" -lt 1500 ] || ! kill -0 "$NEW_PID" 2>/dev/null; then
+                USER_STOP=true
+                STOP_REASON="User activity detected"
+                break
+            fi
+
+            CURRENT_PERIOD=$(get_cached_config "$WINEPREFIX_PATH/random_period.conf" "60")
+            ELAPSED=$(( $(date +%s) - START_TIME ))
+            if [ ${#VALID_ARRAY[@]} -gt 1 ] && [ $ELAPSED -ge "$CURRENT_PERIOD" ]; then
+                break
             fi
         done
 
         if $USER_STOP; then
             echo -e "\n[$(date +%H:%M:%S)] CLEANUP: $STOP_REASON."
             kill -9 "$NEW_PID" 2>/dev/null
+
+            # --- MINIMIZED LATENCY LOCKING ---
+            # We lock here, as soon as activity is detected and process is killed
+            LockSc=$(get_cached_config "/home/$USER/.winscr/lockscreen.conf" "0")
+            if [ "$LockSc" -gt "0" ] && ! is_screen_locked; then
+                loginctl lock-session
+                echo -e "[$(date +%H:%M:%S)] Locking Screen."
+            fi
+
             WINEPREFIX="$WINEPREFIX_PATH" wineboot -s 2>/dev/null
             break
         fi
-
         OLD_PID="$NEW_PID"
     done
 }
 
-# MAIN SERVICE LOOP
+# --- MAIN SERVICE LOOP ---
 while true; do
-    get_cached_config "$WINEPREFIX_PATH/timeout.conf" "60" "SCR_TIME"
-    IDLE_LIMIT=$((SCR_TIME * 1000))
-    CURRENT_IDLE=$(xprintidle)
+    SCR_TIME=$(get_cached_config "$WINEPREFIX_PATH/timeout.conf" "60")
 
-    if [ "$CURRENT_IDLE" -ge "$IDLE_LIMIT" ]; then
+    # 1. Reset timer if system is locked
+    if is_screen_locked; then
+        APP_TIMER=0
+        sleep 5
+        continue
+    fi
+
+    # 2. Reset timer if physical movement detected
+    if [ "$(xprintidle)" -lt 1500 ]; then
+        APP_TIMER=0
+    fi
+
+    # 3. Check for Video Activity
+    if is_video_engine_active; then
+        APP_TIMER=0
+        printf "\r[STATUS] Video activity detected! Timer Reset.             "
+        xset s reset 2>/dev/null
+        sleep 2
+        continue
+    fi
+
+    # 4. Handle Countdown or Launch
+    if [ "$APP_TIMER" -ge "$SCR_TIME" ]; then
         trigger_cmd
+        APP_TIMER=0
     else
-        VIDEO_MSG_SENT=false
-        REMAINING_IDLE=$(( (IDLE_LIMIT - CURRENT_IDLE) / 1000 ))
-        [ "$REMAINING_IDLE" -lt 0 ] && REMAINING_IDLE=0
-        printf "\r[IDLE MONITOR] Screensaver starting in: %02d seconds... " "$REMAINING_IDLE"
+        REMAINING=$(( SCR_TIME - APP_TIMER ))
+        printf "\r[TIMER] Starting in: %02d seconds... (Current: %ss)      " "$REMAINING" "$APP_TIMER"
+        ((APP_TIMER++))
     fi
 
     sleep 1

@@ -57,10 +57,10 @@ MENU_ITEMS+=(
     FALSE "About XScresavers"
 )
 
-Choice=$(zenity --list --radiolist --title="Win Screensavers Menu" \
+Choice=$(zenity  --list --radiolist --title="Win Screensavers Menu" \
     --text "Current Mode: $SCR_SAVER" \
     --column "Pick" --column "Answer" \
-    "${MENU_ITEMS[@]}" --height=480 --width=400)
+    "${MENU_ITEMS[@]}" --height=480 --width=400 )
 
 case $Choice in
     'Choose Screensaver') kstart bash "$WINEPREFIX_PATH/winscr_choose.sh" & ;;

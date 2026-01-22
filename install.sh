@@ -1,19 +1,22 @@
 #!/bin/bash
-# Final version 2026 - Fresh Start with Registry Preservation
+# Final version 2026 - Fresh Start with Silent Initialization
 
 echo "##################################################################"
-echo "#                    Installing XScreensaver                     #"
+echo "#                    Installing WinScreensaver                   #"
 echo "#       Developed for X11 & KDE Plasma by sergio melas 2026      #"
 echo "##################################################################"
 
-# Dependency check (procps provides pgrep)
-sudo apt-get update && sudo apt-get install -y wine wine32 xprintidle x11-xserver-utils procps playerctl wireplumber
+# 1. SILENT DEPENDENCY CHECK
+# Added -qq for apt and redirected output to /dev/null
+echo "Checking system dependencies..."
+sudo apt-get update -qq
+sudo apt-get install -y -qq wine wine32 xprintidle x11-xserver-utils procps playerctl wireplumber > /dev/null 2>&1
 
 INSTALL_DIR="/home/$USER/.winscr"
 TEMP_BACKUP="/tmp/winscr_temp_$(date +%s)"
 SCR_TARGET="$INSTALL_DIR/drive_c/windows/system32"
 
-# 1. BUFFER SETTINGS
+# 2. BUFFER SETTINGS
 if [ -d "$INSTALL_DIR" ]; then
     echo "Buffering user registry and configs..."
     mkdir -p "$TEMP_BACKUP"
@@ -22,33 +25,32 @@ if [ -d "$INSTALL_DIR" ]; then
     rm -rf "$INSTALL_DIR"
 fi
 
-# 2. FRESH DIRECTORY & WINE INITIALIZATION
+# 3. SILENT WINE INITIALIZATION
 mkdir -p "$INSTALL_DIR"
-echo "Initializing fresh Wine environment..."
-WINEPREFIX="$INSTALL_DIR" wineboot --init
+echo "Initializing fresh Wine environment (please wait)..."
+# WINEDEBUG=-all removes the ole/rpc error messages from the terminal
+export WINEPREFIX="$INSTALL_DIR"
+export WINEDEBUG=-all
+wineboot --init > /dev/null 2>&1
 
-# CRITICAL: Wait for Wine to finish initializing and then SHUT IT DOWN
-# This ensures the new (default) registry files are actually written to disk
-# so we can safely overwrite them.
 sleep 5
-WINEPREFIX="$INSTALL_DIR" wineboot -s
+wineboot -s > /dev/null 2>&1
 sleep 2
 
-# 3. DEPLOY FRESH PAYLOAD
+# 4. DEPLOY FRESH PAYLOAD
 echo "Deploying fresh scripts and assets..."
 cp ./Payload/*.sh "$INSTALL_DIR/"
 cp ./Payload/winscr_icon.png "$INSTALL_DIR/"
 chmod +x "$INSTALL_DIR"/*.sh
 
-# 4. DEPLOY CURRENT SCREENSAVERS
+# 5. DEPLOY CURRENT SCREENSAVERS
 echo "Deploying screensavers to system32..."
 mkdir -p "$SCR_TARGET"
 cp ./'Scr files'/*.scr "$SCR_TARGET/"
 
-# 5. RESTORE SETTINGS (Now safe from being overwritten)
+# 6. RESTORE SETTINGS
 if [ -d "$TEMP_BACKUP" ]; then
     echo "Restoring buffered settings and registry..."
-    # Overwrite the fresh default registry with your saved user settings
     cp "$TEMP_BACKUP"/*.reg "$INSTALL_DIR/" 2>/dev/null
     cp "$TEMP_BACKUP"/*.conf "$INSTALL_DIR/" 2>/dev/null
     rm -rf "$TEMP_BACKUP"
@@ -56,7 +58,7 @@ else
     cp ./Payload/*.conf "$INSTALL_DIR/" 2>/dev/null
 fi
 
-# 5. REFRESH DESKTOP & AUTOSTART (Prevents Duplicates)
+# 7. REFRESH DESKTOP & AUTOSTART
 cat <<EOF > "$HOME/.local/share/applications/WinScreensaver.desktop"
 [Desktop Entry]
 Name=WinScreensaver
@@ -73,23 +75,29 @@ Type=Application
 X-KDE-AutostartScript=true
 EOF
 
-# 6. RESTART SERVICE
+# 8. RESTART SERVICE
 echo "Stopping old processes..."
 pkill -f "winscr_screensaver.sh" 2>/dev/null
-
-# CRITICAL: If wineserver is still running from 'wineboot',
-# the runner might hang. Force it to stop.
-wineboot -s 2>/dev/null
+pkill -f "winscr_choose.sh" 2>/dev/null
+# Silently stop wine without restarting the whole session
+WINEPREFIX="$INSTALL_DIR" wineboot -s > /dev/null 2>&1
 sleep 2
 
-echo "Launching service in the background..."
+echo "Launching service safely in the background..."
 
-# 1. Start the screensaver runner service DETACHED
-# setsid creates a new session so the service doesn't die when the installer exits.
-# we redirect output to a log file so you can see if it fails.
-setsid nohup bash "$INSTALL_DIR/winscr_screensaver.sh" > "$INSTALL_DIR/service.log" 2>&1 &
-setsid nohup bash "$INSTALL_DIR/winscr_choose.sh" &
+# Use subshells and redirection to detach from the terminal properly
+# This prevents the script from closing when the installer exits
+( nohup "$INSTALL_DIR/winscr_screensaver.sh" > /dev/null 2>&1 & )
+( nohup "$INSTALL_DIR/winscr_choose.sh" > /dev/null 2>&1 & )
 
+# Ensure .desktop files are executable (Mandatory in 2026 for KDE 6)
+chmod +x "$HOME/.local/share/applications/WinScreensaver.desktop"
+chmod +x "$HOME/.config/autostart/winscr_service.desktop"
 
-echo "Installation Finished. Service is running (check $INSTALL_DIR/service.log for errors)."
+# Refresh the Plasma shell ONLY if needed (does NOT log you out)
+# This is safe and won't kill your windows
+if command -v systemctl >/dev/null; then
+    systemctl --user daemon-reload
+fi
 
+echo "Installation Finished. Service is running in the background."
