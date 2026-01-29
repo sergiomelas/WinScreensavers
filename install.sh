@@ -10,7 +10,7 @@ echo "##################################################################"
 # Added -qq for apt and redirected output to /dev/null
 echo "Checking system dependencies..."
 sudo apt-get update -qq
-sudo apt-get install -y -qq wine wine32 xprintidle x11-xserver-utils procps playerctl wireplumber > /dev/null 2>&1
+sudo apt-get install -y -qq wine wine32 xprintidle x11-xserver-utils procps playerctl wireplumber swayidle > /dev/null 2>&1
 
 INSTALL_DIR="/home/$USER/.winscr"
 TEMP_BACKUP="/tmp/winscr_temp_$(date +%s)"

@@ -1,14 +1,13 @@
 #!/bin/bash
 # filename: winscr_screensaver.sh
-# Final version 2026 for X11 & Wayland (KDE Plasma 6)
+# Final version 2026 for X11 & KDE Plasma 6
 # Features: Application Timer, Video Reset, Lock-Detection Fix, and Status Messaging
-
 
 # Display title block
 echo " "
 echo " ##################################################################"
 echo " #                 Windows screensavers launcher                  #"
-echo " #    Developed for X11/Wayland & KDE Plasma by sergio melas 2026 #"
+echo " #       Developed for X11 & KDE Plasma by sergio melas 2026      #"
 echo " #                                                                #"
 echo " #                Email: sergiomelas@gmail.com                    #"
 echo " #                   Released under GPL V2.0                      #"
@@ -16,33 +15,11 @@ echo " ##################################################################"
 echo " "
 echo "--- Service Started: $(date '+%Y-%m-%d %H:%M:%S') ---"
 
-
-# --- SESSION DETECTION & WAYLAND ACTIVITY ENGINE ---
-# Wayland does not allow direct idle polling like X11's xprintidle.
-# We use swayidle to create a 'marker' file when idle and delete it on activity.
-if [ "$XDG_SESSION_TYPE" == "wayland" ]; then
-    IS_WAYLAND=true
-    # Ensure swayidle background tracker is running
-    if ! pgrep -x "swayidle" > /dev/null; then
-        nohup swayidle -w timeout 1 'touch /tmp/winscr_idle' resume 'rm -f /tmp/winscr_idle' > /dev/null 2>&1 &
-    fi
-    # Logic to calculate idle time in milliseconds by checking the age of the marker file
-    IDLE_CMD_LOGIC='if [ -f /tmp/winscr_idle ]; then echo $((($(date +%s) - $(stat -c %Y /tmp/winscr_idle)) * 1000)); else echo 0; fi'
-else
-    IS_WAYLAND=false
-    # Standard X11 command
-    IDLE_CMD_LOGIC='xprintidle'
-fi
-
-
-
 # --- TERMINATION HANDLER ---
 cleanup_exit() {
     echo -e "\n[$(date +%H:%M:%S)] SHUTDOWN: Signal received. Cleaning up..."
     [[ -n "$NEW_PID" ]] && kill -9 "$NEW_PID" 2>/dev/null
     [[ -n "$OLD_PID" ]] && kill -9 "$OLD_PID" 2>/dev/null
-    # Clean up Wayland marker on exit
-    rm -f /tmp/winscr_idle
     WINEPREFIX="/home/$USER/.winscr" wineboot -s 2>/dev/null
     exit 0
 }
@@ -70,7 +47,7 @@ get_cached_config() {
 }
 
 is_screen_locked() {
-    # Detects if KDE Plasma lock screen is active (Plasma 5/6 compatible)
+    # Detects if KDE Plasma lock screen is active
     local locked=$(qdbus6 org.freedesktop.ScreenSaver /org/freedesktop/ScreenSaver GetActive 2>/dev/null || \
                    qdbus org.freedesktop.ScreenSaver /org/freedesktop/ScreenSaver GetActive 2>/dev/null)
     if [[ "$locked" == "true" ]]; then return 0; fi
@@ -108,11 +85,8 @@ trigger_cmd() {
 
     OLD_PID=""
     while true; do
-        # Detect idle time using the appropriate engine logic
-        IDLE_MS=$(eval "$IDLE_CMD_LOGIC")
-
         # Exit if user moves mouse or screen is locked
-        if [ "$IDLE_MS" -lt 1500 ] || is_screen_locked; then
+        if [ "$(xprintidle)" -lt 1500 ] || is_screen_locked; then
             break;
         fi
 
@@ -139,9 +113,8 @@ trigger_cmd() {
                 break
             fi
 
-            # Monitor physical activity using the engine logic
-            IDLE_MS=$(eval "$IDLE_CMD_LOGIC")
-            if [ "$IDLE_MS" -lt 1500 ] || ! kill -0 "$NEW_PID" 2>/dev/null; then
+            # Monitor physical activity
+            if [ "$(xprintidle)" -lt 1500 ] || ! kill -0 "$NEW_PID" 2>/dev/null; then
                 USER_STOP=true
                 STOP_REASON="User activity detected"
                 break
@@ -159,9 +132,9 @@ trigger_cmd() {
             kill -9 "$NEW_PID" 2>/dev/null
 
             # --- MINIMIZED LATENCY LOCKING ---
+            # We lock here, as soon as activity is detected and process is killed
             LockSc=$(get_cached_config "/home/$USER/.winscr/lockscreen.conf" "0")
             if [ "$LockSc" -gt "0" ] && ! is_screen_locked; then
-                # loginctl is the universal standard for locking sessions
                 loginctl lock-session
                 echo -e "[$(date +%H:%M:%S)] Locking Screen."
             fi
@@ -185,8 +158,7 @@ while true; do
     fi
 
     # 2. Reset timer if physical movement detected
-    IDLE_MS=$(eval "$IDLE_CMD_LOGIC")
-    if [ "$IDLE_MS" -lt 1500 ]; then
+    if [ "$(xprintidle)" -lt 1500 ]; then
         APP_TIMER=0
     fi
 
@@ -194,10 +166,7 @@ while true; do
     if is_video_engine_active; then
         APP_TIMER=0
         printf "\r[STATUS] Video activity detected! Timer Reset.             "
-        # Only run xset if on an X11 session
-        if [ "$IS_WAYLAND" == "false" ]; then
-            xset s reset 2>/dev/null
-        fi
+        xset s reset 2>/dev/null
         sleep 2
         continue
     fi

@@ -34,6 +34,7 @@ Change log:
  -V2.1.3 22-08-2025: Corrected bug on alredy running lock screen
  -V2.2   22-01-2026: Updated the bottle creation following new sintax, upgraded menus beaviours with chosen option,
                      added random screensaver cycling,avoid more then one istace ,clean up
+ -V2.3   29-01-2026: Added support for Wayland
 
 
 Thx to Christitus for the inspirational post : https://www.youtube.com/watch?v=J2zasJz5vuA&t=384s
