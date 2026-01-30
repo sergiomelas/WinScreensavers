@@ -1,103 +1,51 @@
 #!/bin/bash
-# Final version 2026 - Fresh Start with Silent Initialization
+# filename: install.sh
+# Purpose: Final version with hardcoded absolute paths and no 'bash' prefix
 
-echo "##################################################################"
-echo "#                    Installing WinScreensaver                   #"
-echo "#       Developed for X11 & KDE Plasma by sergio melas 2026      #"
-echo "##################################################################"
+echo " "
+echo " ##################################################################"
+echo " #                                                                #"
+echo " #                Windows screensavers launcher                   #"
+echo " #    Developed for X11/Wayland & KDE Plasma by sergio melas 2026 #"
+echo " #                                                                #"
+echo " #                Email: sergiomelas@gmail.com                    #"
+echo " #                   Released under GPL V2.0                      #"
+echo " #                                                                #"
+echo " ##################################################################"
+echo " "
 
-# 1. SILENT DEPENDENCY CHECK
-# Added -qq for apt and redirected output to /dev/null
-echo "Checking system dependencies..."
-sudo apt-get update -qq
-sudo apt-get install -y -qq wine wine32 xprintidle x11-xserver-utils procps playerctl wireplumber swayidle > /dev/null 2>&1
+# Get the actual home directory path as a string
+REAL_HOME=$(eval echo ~$USER)
+WINEPREFIX_PATH="$REAL_HOME/.winscr"
+SYS_PATH="/usr/share/winscreensaver/Payload"
+AUTOSTART_DIR="$REAL_HOME/.config/autostart"
 
-INSTALL_DIR="/home/$USER/.winscr"
-TEMP_BACKUP="/tmp/winscr_temp_$(date +%s)"
-SCR_TARGET="$INSTALL_DIR/drive_c/windows/system32"
+# 1. Ensure local directories exist
+mkdir -p "$WINEPREFIX_PATH/drive_c/windows/system32"
+mkdir -p "$AUTOSTART_DIR"
 
-# 2. BUFFER SETTINGS
-if [ -d "$INSTALL_DIR" ]; then
-    echo "Buffering user registry and configs..."
-    mkdir -p "$TEMP_BACKUP"
-    cp "$INSTALL_DIR"/*.reg "$TEMP_BACKUP/" 2>/dev/null
-    cp "$INSTALL_DIR"/*.conf "$TEMP_BACKUP/" 2>/dev/null
-    rm -rf "$INSTALL_DIR"
-fi
+# 2. Sync scripts
+cp "$SYS_PATH"/*.sh "$WINEPREFIX_PATH/"
+cp "$SYS_PATH"/*.conf "$WINEPREFIX_PATH/"
+chmod +x "$WINEPREFIX_PATH"/*.sh
 
-# 3. SILENT WINE INITIALIZATION
-mkdir -p "$INSTALL_DIR"
-echo "Initializing fresh Wine environment (please wait)..."
-# WINEDEBUG=-all removes the ole/rpc error messages from the terminal
-export WINEPREFIX="$INSTALL_DIR"
-export WINEDEBUG=-all
-wineboot --init > /dev/null 2>&1
-
-sleep 5
-wineboot -s > /dev/null 2>&1
-sleep 2
-
-# 4. DEPLOY FRESH PAYLOAD
-echo "Deploying fresh scripts and assets..."
-cp ./Payload/*.sh "$INSTALL_DIR/"
-cp ./Payload/winscr_icon.png "$INSTALL_DIR/"
-chmod +x "$INSTALL_DIR"/*.sh
-
-# 5. DEPLOY CURRENT SCREENSAVERS
-echo "Deploying screensavers to system32..."
-mkdir -p "$SCR_TARGET"
-cp ./'Scr files'/*.scr "$SCR_TARGET/"
-
-# 6. RESTORE SETTINGS
-if [ -d "$TEMP_BACKUP" ]; then
-    echo "Restoring buffered settings and registry..."
-    cp "$TEMP_BACKUP"/*.reg "$INSTALL_DIR/" 2>/dev/null
-    cp "$TEMP_BACKUP"/*.conf "$INSTALL_DIR/" 2>/dev/null
-    rm -rf "$TEMP_BACKUP"
-else
-    cp ./Payload/*.conf "$INSTALL_DIR/" 2>/dev/null
-fi
-
-# 7. REFRESH DESKTOP & AUTOSTART
-cat <<EOF > "$HOME/.local/share/applications/WinScreensaver.desktop"
+# 3. Create the Direct Autostart Entry
+# Notice: No 'bash' prefix and the path is expanded now!
+cat <<EOF > "$AUTOSTART_DIR/winscreensaver.desktop"
 [Desktop Entry]
-Name=WinScreensaver
-Exec=$INSTALL_DIR/winscr_menu.sh
-Icon=$INSTALL_DIR/winscr_icon.png
 Type=Application
-EOF
-
-cat <<EOF > "$HOME/.config/autostart/winscr_service.desktop"
-[Desktop Entry]
+Exec=$WINEPREFIX_PATH/winscr_screensaver.sh
+Hidden=false
+NoDisplay=false
+X-GNOME-Autostart-enabled=true
 Name=WinScreensaver Service
-Exec=$INSTALL_DIR/winscr_screensaver.sh
-Type=Application
-X-KDE-AutostartScript=true
+Comment=Starts the screensaver monitor at login
 EOF
 
-# 8. RESTART SERVICE
-echo "Stopping old processes..."
-pkill -f "winscr_screensaver.sh" 2>/dev/null
-pkill -f "winscr_choose.sh" 2>/dev/null
-# Silently stop wine without restarting the whole session
-WINEPREFIX="$INSTALL_DIR" wineboot -s > /dev/null 2>&1
-sleep 2
-
-echo "Launching service safely in the background..."
-
-# Use subshells and redirection to detach from the terminal properly
-# This prevents the script from closing when the installer exits
-( nohup "$INSTALL_DIR/winscr_screensaver.sh" > /dev/null 2>&1 & )
-( nohup "$INSTALL_DIR/winscr_choose.sh" > /dev/null 2>&1 & )
-
-# Ensure .desktop files are executable (Mandatory in 2026 for KDE 6)
-chmod +x "$HOME/.local/share/applications/WinScreensaver.desktop"
-chmod +x "$HOME/.config/autostart/winscr_service.desktop"
-
-# Refresh the Plasma shell ONLY if needed (does NOT log you out)
-# This is safe and won't kill your windows
-if command -v systemctl >/dev/null; then
-    systemctl --user daemon-reload
+# 4. Trigger the service immediately for this session
+if ! pgrep -f "winscr_screensaver.sh" > /dev/null; then
+    nohup "$WINEPREFIX_PATH/winscr_screensaver.sh" > /dev/null 2>&1 &
+    disown
 fi
 
-echo "Installation Finished. Service is running in the background."
+zenity --info --text="Installation complete. Direct path set to: $WINEPREFIX_PATH/winscr_screensaver.sh" --title="Success"

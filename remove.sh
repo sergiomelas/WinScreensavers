@@ -1,45 +1,36 @@
 #!/bin/bash
 # filename: remove.sh
-# Final version 2026 for X11 & KDE Plasma 6
+# Purpose: Clean up user-space environment during uninstallation
 
 echo " "
-echo "##################################################################"
-echo "#                   Uninstalling XScreensaver                    #"
-echo "#       Developed for X11 & KDE Plasma by sergio melas 2026      #"
-echo "##################################################################"
+echo " ##################################################################"
+echo " #                                                                #"
+echo " #                Windows screensavers launcher                   #"
+echo " #    Developed for X11/Wayland & KDE Plasma by sergio melas 2026 #"
+echo " #                                                                #"
+echo " #                Email: sergiomelas@gmail.com                    #"
+echo " #                   Released under GPL V2.0                      #"
+echo " #                                                                #"
+echo " ##################################################################"
+echo " "
 
-WINEPREFIX_PATH="/home/$USER/.winscr"
+WINEPREFIX_PATH="$HOME/.winscr"
 
-echo "Stopping services and Wine processes..."
-# 1. Kill the bash service loop first
+# 1. Kill any active processes
+echo "Stopping background services..."
 pkill -f "winscr_screensaver.sh" 2>/dev/null
+pkill -f "winscr_menu.sh" 2>/dev/null
+pkill -f ".scr" 2>/dev/null
 
-# 2. Kill the wine environment properly
-export WINEPREFIX="$WINEPREFIX_PATH"
-wineserver -k 2>/dev/null
-# Wait a moment for Wine to release file locks
-sleep 1
-
-# 3. Force kill any remaining stray wine processes for this prefix
-pgrep -f "$WINEPREFIX_PATH" | xargs kill -9 2>/dev/null
-
-echo "Removing application files..."
-# 4. Remove the main installation directory
-if [ -d "$WINEPREFIX_PATH" ]; then
-    rm -rf "$WINEPREFIX_PATH"
-    echo "  [OK] Installation directory removed."
+# 2. Remove from Autostart
+if [ -f "$HOME/.config/autostart/winscreensaver.desktop" ]; then
+    echo "Removing autostart entry..."
+    rm "$HOME/.config/autostart/winscreensaver.desktop"
 fi
 
-echo "Removing desktop shortcuts..."
-# 5. Remove the autostart and menu entries
-rm -f "$HOME/.config/autostart/winscr_service.desktop"
-rm -f "$HOME/.local/share/applications/WinScreensaver.desktop"
+# 3. Optional: Notification
+# We leave the ~/.winscr folder intact so the user doesn't lose their .scr files
+# If you want to wipe everything, uncomment the line below:
+# rm -rf "$WINEPREFIX_PATH"
 
-# 6. Notify the desktop environment to refresh its menus
-if command -v update-desktop-database >/dev/null; then
-    update-desktop-database "$HOME/.local/share/applications/" 2>/dev/null
-fi
-
-echo " "
-echo "WinScreensaver has been successfully removed."
-echo "##################################################################"
+echo "User-space cleanup complete."

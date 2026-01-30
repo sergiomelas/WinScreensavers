@@ -3,19 +3,21 @@
 
 echo " "
 echo " ##################################################################"
+echo " #                                                                #"
 echo " #                        Choose Timeout                          #"
-echo " #       Developed for X11 & KDE Plasma by sergio melas 2026      #"
+echo " #    Developed for X11/Wayland & KDE Plasma by sergio melas 2026 #"
 echo " #                                                                #"
 echo " #                Emai: sergiomelas@gmail.com                     #"
 echo " #                   Released under GPL V2.0                      #"
 echo " #                                                                #"
 echo " ##################################################################"
+echo " "
 
+# --- 1. PATH CONFIGURATION ---
+WINEPREFIX_PATH="$HOME/.winscr"
+CURRENT_TIM=$(cat "$WINEPREFIX_PATH/timeout.conf" 2>/dev/null || echo "600")
 
-
-WINEPREFIX_PATH="/home/$USER/.winscr"
-CURRENT_TIM=$(cat "$WINEPREFIX_PATH/timeout.conf" 2>/dev/null || echo "300")
-
+# --- 2. DEFINE BULLET OPTIONS ---
 OPTIONS=(
     "30 seconds" 30
     "2 minutes"  120
@@ -34,8 +36,11 @@ for ((i=0; i<${#OPTIONS[@]}; i+=2)); do
     ZEN_ARGS+=("$STATE" "${OPTIONS[i]}")
 done
 
-PICK=$(zenity --list --radiolist --title="Screensaver Timeout" --column "Pick" --column "Answer" "${ZEN_ARGS[@]}" --height=400)
+# --- 3. LAUNCH ZENITY BULLETS ---
+PICK=$(zenity --list --radiolist --title="Screensaver Timeout" \
+    --column "Pick" --column "Answer" "${ZEN_ARGS[@]}" --height=450 --width=350)
 
+# --- 4. PROCESS CHOICE ---
 if [ -n "$PICK" ]; then
     NEW_TIMEOUT=0
     for ((i=0; i<${#OPTIONS[@]}; i+=2)); do
@@ -46,19 +51,11 @@ if [ -n "$PICK" ]; then
         fi
     done
 
-    # --- 2026 CONFLICT DETECTION (KDE 6 FIX) ---
-
-    # 1. Read KDE Screen Lock Timeout (Seconds)
-    # kscreenlockerrc stores this in seconds. If 0 or missing, it is disabled.
+    # --- 5. KDE 6 CONFLICT DETECTION ---
     KDE_LOCK=$(kreadconfig6 --file kscreenlockerrc --group "Daemon" --key "Timeout" --default 0)
     KDE_LOCK_ENABLED=$(kreadconfig6 --file kscreenlockerrc --group "Daemon" --key "Autolock" --default "false")
-
-    # 2. Read KDE Screen Energy Saving (DPMS)
-    # In Plasma 6, idleTime is stored in powermanagementprofilesrc under [AC][DPMSControl]
-    # Units are typically seconds.
     KDE_BLANK=$(kreadconfig6 --file powermanagementprofilesrc --group "AC" --group "DPMSControl" --key "idleTime" --default 0)
 
-    # Validation: Treat missing/invalid values as 0 (not a conflict)
     [[ ! "$KDE_LOCK" =~ ^[0-9]+$ ]] && KDE_LOCK=0
     [[ ! "$KDE_BLANK" =~ ^[0-9]+$ ]] && KDE_BLANK=0
 
@@ -66,12 +63,10 @@ if [ -n "$PICK" ]; then
     MSG="<b>WARNING: Conflict Detected!</b>\n\nYour screensaver is set to <b>$PICK</b> ($NEW_TIMEOUT s),\nbut system settings will interfere:\n"
 
     if [ "$NEW_TIMEOUT" -lt 1000000000 ]; then
-        # Check if Monitor turns off BEFORE screensaver starts
         if [ "$KDE_BLANK" -gt 0 ] && [ "$NEW_TIMEOUT" -ge "$KDE_BLANK" ]; then
             MSG+="\n- <b>Screen Energy Saving:</b> Happens at ${KDE_BLANK}s. (Monitor turns off first)"
             CONFLICT=true
         fi
-        # Check if System Lock screen blocks the screensaver
         if [[ "$KDE_LOCK_ENABLED" == "true" ]] && [ "$KDE_LOCK" -gt 0 ] && [ "$NEW_TIMEOUT" -ge "$KDE_LOCK" ]; then
             MSG+="\n- <b>Screen Lock:</b> Happens at ${KDE_LOCK}s. (Lock screen takes priority)"
             CONFLICT=true
@@ -79,10 +74,26 @@ if [ -n "$PICK" ]; then
     fi
 
     if [ "$CONFLICT" = true ]; then
-        MSG+="\n\n<b>To fix this:</b>\n1. Go to <i>System Settings > Power Management</i>.\n2. Set 'Screen Energy Saving' and 'Screen Lock' to values <b>HIGHER</b> than $NEW_TIMEOUT s."
+        MSG+="\n\n<b>To fix this:</b>\n1. Go to <i>System Settings > Power Management</i>.\n2. Set system values <b>HIGHER</b> than $NEW_TIMEOUT s."
         zenity --warning --title="Timeout Conflict" --text="$MSG" --width=450 --no-wrap
     fi
 fi
 
-rm -f "$WINEPREFIX_PATH"/.running
-kstart bash "$WINEPREFIX_PATH/winscr_menu.sh" &
+# --- 6. UNLOCK & RELAUNCH MENU (Standardized Fixed Block) ---
+rm -f "$WINEPREFIX_PATH/.running"
+
+KSRT_EXE=$(command -v kstart6 || command -v kstart5 || command -v kstart)
+
+if command -v winscreensaver >/dev/null; then
+    LAUNCH_CMD="winscreensaver"
+else
+    LAUNCH_CMD="bash $WINEPREFIX_PATH/winscr_menu.sh"
+fi
+
+if [ -n "$KSRT_EXE" ]; then
+    $KSRT_EXE $LAUNCH_CMD &
+else
+    $LAUNCH_CMD &
+fi
+
+exit 0
