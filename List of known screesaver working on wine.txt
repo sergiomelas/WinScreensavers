@@ -1,0 +1,25 @@
+List of known scresavers working in wine so working with this.
+You can find them on line
+If you have more cool .scr that works with my tool let me know so i can update this list
+
+3D Flying Objects.scr
+Euphoria.scr
+FanFish25.scr
+FieldLines.scr
+Flux.scr
+Helios.scr
+Hyperspace.scr
+Lattice.scr
+Matrix
+Microcosm.scr
+Mystify.scr
+Pipes.scr
+pippo.txt
+Ribbons.scr
+RollerCoasterScreenSaver
+Science.scr
+Sea.scr
+SolarWinds.scr
+Space.scr
+Star Trek 3D Starships.scr
+Windows 98.scr
