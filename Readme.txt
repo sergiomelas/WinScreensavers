@@ -25,16 +25,16 @@ Installation Instructions:
    - Select the folder containing your .scr files when prompted.
 
 4. Activation:
-   - The service starts automatically after setup and is added to your KDE Autostart.
+   - The service starts automatically after setup and is added to your Autostart.
    - You do NOT need to logout; the service begins monitoring immediately.
 
 How to add screensavers with installers:
 To install screensavers that require a setup.exe, use the following command to ensure they land in the correct folder:
 WINEPREFIX=/home/$USER/.winscr wine <path_to_installer.exe>
 
-Note: To ensure the screensaver triggers correctly, set your KDE "Screen Locking" and "Power Management" (Screen Energy Saving) timeouts to be LARGER than the screensaver timeout set in the WinScreensaver menu.
+Note: To ensure the screensaver triggers correctly, set your "Screen Locking" and "Power Management" (Screen Energy Saving) timeouts to be LARGER than the screensaver timeout set in the WinScreensaver menu.
 
-Latest Version: https://github.com/sergiomelas/Kde-X11-Screensavers
+Latest Version: https://github.com/sergiomelas/WinScreensavers
 
 ##################################################################################################################
 Change log:
