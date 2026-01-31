@@ -32,21 +32,7 @@ else
     fi
 fi
 
-# --- 4. UNLOCK & RELAUNCH MENU (Standardized Fixed Block) ---
+# --- 4. THE UNIVERSAL HANDOVER ---
 rm -f "$WINEPREFIX_PATH/.running"
-
-KSRT_EXE=$(command -v kstart6 || command -v kstart5 || command -v kstart)
-
-if command -v winscreensaver >/dev/null; then
-    LAUNCH_CMD="winscreensaver"
-else
-    LAUNCH_CMD="bash $WINEPREFIX_PATH/winscr_menu.sh"
-fi
-
-if [ -n "$KSRT_EXE" ]; then
-    $KSRT_EXE $LAUNCH_CMD &
-else
-    $LAUNCH_CMD &
-fi
-
+winscreensaver &
 exit 0

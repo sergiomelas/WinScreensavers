@@ -1,11 +1,12 @@
 #!/bin/bash
 # filename: remove.sh
-# Purpose: Clean up user-space environment during uninstallation
+# Final version 2026 - User Space Cleanup
+# Developed for X11/Wayland by sergio melas 2026
 
 echo " "
 echo " ##################################################################"
 echo " #                                                                #"
-echo " #                Windows screensavers launcher                   #"
+echo " #                Windows screensavers remover                    #"
 echo " #    Developed for X11/Wayland & KDE Plasma by sergio melas 2026 #"
 echo " #                                                                #"
 echo " #                Email: sergiomelas@gmail.com                    #"
@@ -15,22 +16,25 @@ echo " ##################################################################"
 echo " "
 
 WINEPREFIX_PATH="$HOME/.winscr"
+AUTOSTART="$HOME/.config/autostart/winscreensaver.desktop"
 
-# 1. Kill any active processes
-echo "Stopping background services..."
-pkill -f "winscr_screensaver.sh" 2>/dev/null
-pkill -f "winscr_menu.sh" 2>/dev/null
-pkill -f ".scr" 2>/dev/null
+# Prompt user for confirmation to prevent accidental deletion
+if zenity --question --title="Remove WinScreensaver Environment" \
+    --text="This will delete all settings and imported screensavers from your home folder.\n\nThe system application will remain installed.\n\nProceed?" --width=400; then
 
-# 2. Remove from Autostart
-if [ -f "$HOME/.config/autostart/winscreensaver.desktop" ]; then
+    echo "Stopping background services..."
+    # Kill the monitoring service if it is running
+    pkill -f "winscr_screensaver.sh" 2>/dev/null
+
+    echo "Removing local files..."
+    # Delete the Wine prefix and local scripts
+    rm -rf "$WINEPREFIX_PATH"
+
     echo "Removing autostart entry..."
-    rm "$HOME/.config/autostart/winscreensaver.desktop"
+    # Remove the desktop entry that starts the service at login
+    rm -f "$AUTOSTART"
+
+    zenity --info --text="User environment removed successfully." --timeout=3
 fi
 
-# 3. Optional: Notification
-# We leave the ~/.winscr folder intact so the user doesn't lose their .scr files
-# If you want to wipe everything, uncomment the line below:
-# rm -rf "$WINEPREFIX_PATH"
-
-echo "User-space cleanup complete."
+exit 0

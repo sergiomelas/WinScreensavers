@@ -13,15 +13,10 @@ echo " #                                                                #"
 echo " ##################################################################"
 echo " "
 
-# --- 1. PATH CONFIGURATION ---
 WINEPREFIX_PATH="$HOME/.winscr"
 PERIOD_CONF="$WINEPREFIX_PATH/random_period.conf"
-
-# --- 2. READ CURRENT CONFIG ---
-# Default to 1 hour (60 minutes) if file is missing
 CURRENT_VAL=$(cat "$PERIOD_CONF" 2>/dev/null || echo "60")
 
-# --- 3. DEFINE BULLET OPTIONS (Timeout Philosophy) ---
 OPTIONS=(
     "30 seconds" 0.5
     "2 minutes"  2
@@ -39,39 +34,21 @@ for ((i=0; i<${#OPTIONS[@]}; i+=2)); do
     ZEN_ARGS+=("$STATE" "${OPTIONS[i]}")
 done
 
-# --- 4. LAUNCH ZENITY BULLETS ---
 PICK=$(zenity --list --radiolist --title="Random Period" \
     --text="How many minutes between screensaver changes?" \
     --column="Pick" --column="Period" \
     "${ZEN_ARGS[@]}" --height=450 --width=350)
 
-# --- 5. PROCESS CHOICE & SAVE ---
 if [ -n "$PICK" ]; then
-    NEW_VAL=0
     for ((i=0; i<${#OPTIONS[@]}; i+=2)); do
         if [ "${OPTIONS[i]}" == "$PICK" ]; then
-            NEW_VAL="${OPTIONS[i+1]}"
-            echo "$NEW_VAL" > "$PERIOD_CONF"
+            echo "${OPTIONS[i+1]}" > "$PERIOD_CONF"
             break
         fi
     done
 fi
 
-# --- 6. UNLOCK & RELAUNCH MENU (Standardized Fixed Block) ---
+# --- THE UNIVERSAL HANDOVER ---
 rm -f "$WINEPREFIX_PATH/.running"
-
-KSRT_EXE=$(command -v kstart6 || command -v kstart5 || command -v kstart)
-
-if command -v winscreensaver >/dev/null; then
-    LAUNCH_CMD="winscreensaver"
-else
-    LAUNCH_CMD="bash $WINEPREFIX_PATH/winscr_menu.sh"
-fi
-
-if [ -n "$KSRT_EXE" ]; then
-    $KSRT_EXE $LAUNCH_CMD &
-else
-    $LAUNCH_CMD &
-fi
-
+winscreensaver &
 exit 0
