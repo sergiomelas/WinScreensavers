@@ -1,5 +1,6 @@
 #!/bin/bash
 # filename: winscr_test.sh
+# Final version 2026 - Clean Display Test Manager
 
 echo " "
 echo " ##################################################################"
@@ -23,25 +24,27 @@ SCR_SAVER=$(cat "$WINEPREFIX_PATH/scrensaver.conf" 2>/dev/null || echo "Random.s
 
 # --- 3. SELECTION LOGIC ---
 if [[ "$SCR_SAVER" == "Random.scr" ]]; then
-    # --- RANDOM MODE: Ask which one to test ---
-    # Try to load the user's specific pool first
+    # --- RANDOM MODE: Clean Display Selector ---
     if [ -f "$WINEPREFIX_PATH/random_list.conf" ]; then
-        readarray -t pool < "$WINEPREFIX_PATH/random_list.conf"
+        mapfile -t pool < "$WINEPREFIX_PATH/random_list.conf"
     else
-        # Fallback to scanning the directory if no pool is defined
-        readarray -t pool < <(find "$SCR_DIR" -maxdepth 1 -iname "*.scr" -printf "%f\n" | sort)
+        mapfile -t pool < <(find "$SCR_DIR" -maxdepth 1 -iname "*.scr" -printf "%f\n" | sort)
     fi
 
-    # Build the Zenity list
+    # Build the Zenity list with hidden ID column
     ZEN_ARGS=()
     for scr in "${pool[@]}"; do
-        [ -z "$scr" ] && continue
-        ZEN_ARGS+=(FALSE "$scr")
+        [[ -z "$scr" ]] && continue
+        # Column 1: Radio button, Column 2: Hidden Full Name, Column 3: Display Name
+        ZEN_ARGS+=(FALSE "$scr" "${scr%.scr}")
     done
 
+    # Display popup: IDs are hidden, return column 2 (full .scr)
     TARGET_SCR=$(zenity --list --radiolist --title="Test Random Pool" \
         --text="Select which screensaver to preview:" \
-        --column="Pick" --column="Screensaver" "${ZEN_ARGS[@]}" --height=450 --width=350)
+        --column="Pick" --column="ID" --column="Screensaver" \
+        --hide-column=2 --print-column=2 \
+        "${ZEN_ARGS[@]}" --height=450 --width=350)
 
     # If user cancels
     if [ -z "$TARGET_SCR" ]; then
@@ -57,14 +60,18 @@ fi
 # --- 4. EXECUTE PREVIEW ---
 if [ -f "$SCR_DIR/$TARGET_SCR" ]; then
     echo "Testing: $TARGET_SCR"
+    # RELEASE LOCK BEFORE WINE so the test window has focus
+    rm -f "$WINEPREFIX_PATH/.running"
+
     # WINEDEBUG=-all keeps the console clean
     # /s is the Windows flag for "Start Screensaver" mode
     WINEDEBUG=-all wine "$SCR_DIR/$TARGET_SCR" /s
 else
     zenity --error --text="File not found: $TARGET_SCR\nPlease check your installation." --width=350
+    rm -f "$WINEPREFIX_PATH/.running"
 fi
 
 # --- 5. THE UNIVERSAL HANDOVER ---
-rm -f "$WINEPREFIX_PATH/.running"
+# Ensure menu returns after preview is closed
 winscreensaver &
 exit 0

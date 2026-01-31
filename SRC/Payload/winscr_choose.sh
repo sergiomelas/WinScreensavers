@@ -1,6 +1,6 @@
 #!/bin/bash
 # filename: winscr_choose.sh
-# Final version 2026 - Choice Manager with Absolute Path Fix
+# Final version 2026 - Choice Manager with Extension Removal Fix
 
 echo " "
 echo " ##################################################################"
@@ -19,10 +19,8 @@ SCR_DIR="$WINEPREFIX_PATH/drive_c/windows/system32"
 CONF_FILE="$WINEPREFIX_PATH/scrensaver.conf"
 
 # --- 1. SCAN FOR SCREENSAVERS ---
-# Use absolute path to find the .scr files
 readarray -t array < <(find "$SCR_DIR" -maxdepth 1 -iname "*.scr" -printf "%f\n" | sort 2>/dev/null)
 
-# Check if we have any files to show
 if [ ${#array[@]} -eq 0 ]; then
     zenity --error --text="No screensavers found in:\n$SCR_DIR" --width=350
     rm -f "$WINEPREFIX_PATH/.running"
@@ -41,14 +39,17 @@ STATE="FALSE"
 [ "$CURRENT_SCR" == "Random.scr" ] && STATE="TRUE"
 ZEN_ARGS+=("$STATE" "Random.scr")
 
-# Add all found .scr files
+# Add found .scr files WITHOUT extension for display
 for scr in "${array[@]}"; do
     STATE="FALSE"
     [ "$CURRENT_SCR" == "$scr" ] && STATE="TRUE"
+    # We pass the full filename ($scr) to Zenity but only the base name for the display column
+    # Zenity returns the item from the last column by default
     ZEN_ARGS+=("$STATE" "$scr")
 done
 
 # --- 4. DISPLAY PICKER ---
+# Using --print-column=2 to ensure the full .scr name is saved while showing clean text
 Choice=$(zenity --list --radiolist --title="Choose Screensaver" \
     --text "Select the active screensaver:" \
     --column="Pick" --column="Screensaver" \
@@ -60,7 +61,6 @@ if [ -n "$Choice" ]; then
 fi
 
 # --- 6. UNIVERSAL HANDOVER ---
-# Clear the lock and relaunch the master menu via the system wrapper
 rm -f "$WINEPREFIX_PATH/.running"
 winscreensaver &
 exit 0
