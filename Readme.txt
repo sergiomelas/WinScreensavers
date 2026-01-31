@@ -12,6 +12,7 @@ Current Setup Features:
 - Automated User-Space setup (environment built in ~/.winscr).
 - Global menu integration with a dedicated system icon.
 - Symmetric Integrity Audit: Automatically detects missing scripts or empty .scr folders.
+- Whayland support is still Alfa. Will be fixed in 3.1
 
 Installation Instructions:
 
