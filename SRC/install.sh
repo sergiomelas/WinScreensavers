@@ -1,6 +1,6 @@
 #!/bin/bash
 # filename: install.sh
-# Final version 2026 - Smart Environment Setup & Collection Discovery
+# Final version 2026 - Space-Proof Environment Setup
 
 echo " "
 echo " ##################################################################"
@@ -14,6 +14,7 @@ echo " #                                                                #"
 echo " ##################################################################"
 echo " "
 
+# Path variables
 REAL_HOME=$(eval echo ~$USER)
 WINEPREFIX_PATH="$REAL_HOME/.winscr"
 SYS_PATH="/usr/share/winscreensaver/Payload"
@@ -23,50 +24,56 @@ mkdir -p "$SCR_DEST"
 
 # 1. WINE INIT
 export WINEPREFIX="$WINEPREFIX_PATH"
+echo "Initializing Wine Prefix..."
 wineboot -u > /dev/null 2>&1
 
 # 2. THE SMART VALIDATION LOOP
 while true; do
+    # Check for existing screensavers
     CURRENT_COUNT=$(find "$SCR_DEST" -maxdepth 1 -iname "*.scr" 2>/dev/null | wc -l)
+
     if [ "$CURRENT_COUNT" -gt 0 ]; then
-        zenity --info --text="Existing screensavers detected ($CURRENT_COUNT files). Keeping collection." --timeout=5
         break
     fi
 
-    # SMART AUTO-DISCOVERY
-    BEST_FOLDER=""
-    MAX_COUNT=0
-    while read -r count_folder; do
-        count=$(echo "$count_folder" | awk '{print $1}')
-        folder=$(echo "$count_folder" | cut -d' ' -f2-)
-        if [ "$count" -gt "$MAX_COUNT" ]; then
-            MAX_COUNT=$count
-            BEST_FOLDER="$folder/"
-        fi
-    done < <(find "$HOME" -maxdepth 5 -iname "*.scr" -exec dirname {} + 2>/dev/null | sort | uniq -c | sort -nr)
+    # --- SPACE-PROOF AUTO-DISCOVERY ---
+    echo "Scanning home for screensaver collections..."
+    # Find the first .scr and get its directory as one solid string
+    BEST_FOLDER=$(find "$HOME" -maxdepth 9 -iname "*.scr" -not -path "*/.*" -print -quit 2>/dev/null | xargs -0 -I {} dirname "{}")
 
+    # --- THE ZENITY FIX (Double Quoted) ---
     if [ -n "$BEST_FOLDER" ] && [ -d "$BEST_FOLDER" ]; then
-        msg="Auto-detected $MAX_COUNT screensavers in:\n$BEST_FOLDER"
-        SCR_SOURCE=$(zenity --file-selection --directory --filename="$BEST_FOLDER" --title="$msg")
+         SCR_SOURCE=$(zenity --file-selection --directory \
+         --title="Import Screensavers, Preselected folder is the one with most .scr" \
+        --filename="$BEST_FOLDER/")
     else
-        SCR_SOURCE=$(zenity --file-selection --directory --title="Select folder CONTAINING .scr files")
+        SCR_SOURCE=$(zenity --file-selection --directory --title="Select folder containing .scr files")
     fi
 
-    [ -z "$SCR_SOURCE" ] && exit 1
-    if [ $(find "$SCR_SOURCE" -maxdepth 1 -iname "*.scr" 2>/dev/null | wc -l) -gt 0 ]; then
-        cp "$SCR_SOURCE"/*.scr "$SCR_DEST/" 2>/dev/null
+    # User clicked Cancel
+    if [ -z "$SCR_SOURCE" ]; then
+        zenity --error --text="Installation aborted. Local environment is incomplete."
+        exit 1
+    fi
+
+    # 3. FINAL COPY VALIDATION
+    # Use quotes around $SCR_SOURCE to handle paths with spaces
+    SOURCE_COUNT=$(find "$SCR_SOURCE" -maxdepth 1 -iname "*.scr" 2>/dev/null | wc -l)
+    if [ "$SOURCE_COUNT" -gt 0 ]; then
+        cp -v "$SCR_SOURCE"/*.scr "$SCR_DEST/" 2>/dev/null
+        zenity --info --text="Successfully imported $SOURCE_COUNT screensavers." --timeout=3
         break
     else
-        zenity --error --text="The selected folder contains 0 .scr files."
+        zenity --error --text="The selected folder contains 0 .scr files. Please pick another."
     fi
 done
 
-# 3. DEPLOY & UNLOCK
+# 4. DEPLOY PAYLOAD & AUTOSTART
 cp -f "$SYS_PATH"/*.sh "$WINEPREFIX_PATH/"
 cp -f "$SYS_PATH"/*.conf "$WINEPREFIX_PATH/"
 chmod +x "$WINEPREFIX_PATH"/*.sh
 
-# Autostart entry for the service
+# Register background service for login
 cat <<EOF > "$REAL_HOME/.config/autostart/winscreensaver.desktop"
 [Desktop Entry]
 Type=Application
@@ -77,16 +84,7 @@ X-GNOME-Autostart-enabled=true
 Name=WinScreensaver Service
 EOF
 
-# Clear PID lock so menu can start immediately after setup
+# 5. UNLOCK & FINISH
 rm -f "$WINEPREFIX_PATH/.running"
-
-# --- CLEANUP LOCAL OVERRIDES ---
-# This disables the "caching" problem by removing old local files
-rm -f "$HOME/.local/share/applications/winscreensaver.desktop"
-rm -f "$HOME/.local/share/applications/winscr_menu.desktop"
-
-# Tell KDE to refresh the menu immediately
-kbuildsycoca6 --noincremental > /dev/null 2>&1 || kbuildsycoca5 --noincremental > /dev/null 2>&1
-
 
 zenity --info --text="Installation successful!" --title="Success"

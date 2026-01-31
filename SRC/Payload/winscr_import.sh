@@ -1,10 +1,11 @@
 #!/bin/bash
 # filename: winscr_import.sh
+# Final version 2026 - Intelligent Import Logic
 
 echo " "
 echo " ##################################################################"
 echo " #                                                                #"
-echo " #                Windows screensavers importer                   #"
+echo " #                Import Windows screensavers                     #"
 echo " #    Developed for X11/Wayland & KDE Plasma by sergio melas 2026 #"
 echo " #                                                                #"
 echo " #                Email: sergiomelas@gmail.com                    #"
@@ -12,43 +13,41 @@ echo " #                   Released under GPL V2.0                      #"
 echo " #                                                                #"
 echo " ##################################################################"
 echo " "
+#!/bin/bash
+# filename: winscr_import.sh
 
 WINEPREFIX_PATH="$HOME/.winscr"
 SCR_DEST="$WINEPREFIX_PATH/drive_c/windows/system32"
 
-# --- SMART AUTO-DISCOVERY (Fixed Logic) ---
-echo "Scanning home for additional screensavers..."
-BEST_FOLDER=""
-MAX_COUNT=0
+# 1. AGGRESSIVE SEARCH (Handling spaces with -print0)
+# We find the first .scr and get its directory, keeping it as one solid string
+BEST_FOLDER=$(find "$HOME" -maxdepth 9 -iname "*.scr" -not -path "*/.*" -print -quit 2>/dev/null | xargs -0 -I {} dirname "{}")
 
-# Use a faster, accurate pipe to find the folder with the most .scr files
-while read -r count_folder; do
-    count=$(echo "$count_folder" | awk '{print $1}')
-    folder=$(echo "$count_folder" | cut -d' ' -f2-)
-
-    if [ "$count" -gt "$MAX_COUNT" ]; then
-        MAX_COUNT=$count
-        BEST_FOLDER="$folder/" # Trailing slash forces Zenity to ENTER the folder
-    fi
-done < <(find "$HOME" -maxdepth 5 -iname "*.scr" -exec dirname {} + 2>/dev/null | sort | uniq -c | sort -nr)
-
-# --- PROMPT USER ---
-if [ -n "$BEST_FOLDER" ] && [ -d "$BEST_FOLDER" ]; then
-    msg="Auto-detected $MAX_COUNT screensavers in:\n$BEST_FOLDER\n\nImport these files or Browse for another folder?"
-    SCR_SOURCE=$(zenity --file-selection --directory --filename="$BEST_FOLDER" --title="$msg")
-else
-    SCR_SOURCE=$(zenity --file-selection --directory --title="Select folder to import .scr files from")
+# 2. DEBUG FALLBACK
+if [ -z "$BEST_FOLDER" ] || [ ! -d "$BEST_FOLDER" ]; then
+    BEST_FOLDER="$HOME"
 fi
 
+# 3. THE ZENITY CALL (The "Quotes" are the secret)
+# Note the double quotes around "$BEST_FOLDER/" - this stops the space bug!
+SCR_SOURCE=$(zenity --file-selection --directory \
+    --title="Import Screensavers, Preselected folder is the one with most .scr" \
+    --filename="$BEST_FOLDER/")
+
+# 4. PROCESSING
 if [ -n "$SCR_SOURCE" ]; then
+    # Use quotes here too so the 'cp' command doesn't break on spaces
     SOURCE_COUNT=$(find "$SCR_SOURCE" -maxdepth 1 -iname "*.scr" 2>/dev/null | wc -l)
+
     if [ "$SOURCE_COUNT" -gt 0 ]; then
-        cp -n "$SCR_SOURCE"/*.scr "$SCR_DEST/" 2>/dev/null
+        cp -v "$SCR_SOURCE"/*.scr "$SCR_DEST/"
         zenity --info --text="Successfully imported $SOURCE_COUNT screensavers." --timeout=3
+    else
+        zenity --error --text="No .scr files found in: $SCR_SOURCE"
     fi
 fi
 
-# --- THE UNIVERSAL HANDOVER ---
+# 5. UNIVERSAL HANDOVER
 rm -f "$WINEPREFIX_PATH/.running"
 winscreensaver &
 exit 0

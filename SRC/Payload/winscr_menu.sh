@@ -1,6 +1,6 @@
 #!/bin/bash
 # filename: winscr_menu.sh
-# Final version 2026 - Master Controller with PID-Lock & Universal Handover
+# Final version 2026 - Master Controller with Dynamic Test Labels
 
 echo " "
 echo " ##################################################################"
@@ -17,66 +17,63 @@ echo " "
 WINEPREFIX_PATH="$HOME/.winscr"
 SCR_DIR="$WINEPREFIX_PATH/drive_c/windows/system32"
 
+# Move to the local directory so scripts find each other
+cd "$WINEPREFIX_PATH" || exit 1
+
 # --- 1. ROBUST PID-LOCK LOGIC ---
-if [ -f "$WINEPREFIX_PATH/.running" ]; then
-    OLD_PID=$(cat "$WINEPREFIX_PATH/.running")
-    if ps -p "$OLD_PID" > /dev/null 2>&1; then
-        echo "Instance already running with PID $OLD_PID. Exiting."
-        exit 0
+if [ -f ".running" ]; then
+    OLD_PID=$(cat ".running")
+    if ! ps -p "$OLD_PID" > /dev/null 2>&1; then
+        rm -f ".running"
     else
-        rm -f "$WINEPREFIX_PATH/.running"
+        exit 0
     fi
 fi
-echo $$ > "$WINEPREFIX_PATH/.running"
+echo $$ > ".running"
 
-# --- 2. SYMMETRIC INTEGRITY AUDIT ---
-CHECK_FILES=(
-    "$WINEPREFIX_PATH/winscr_screensaver.sh"
-    "$WINEPREFIX_PATH/winscr_choose.sh"
-    "$WINEPREFIX_PATH/winscr_configure.sh"
-    "$WINEPREFIX_PATH/winscr_lock.sh"
-    "$WINEPREFIX_PATH/winscr_random_choose.sh"
-    "$WINEPREFIX_PATH/winscr_random_period.sh"
-    "$WINEPREFIX_PATH/winscr_test.sh"
-    "$WINEPREFIX_PATH/winscr_timeout.sh"
-    "$WINEPREFIX_PATH/winscr_about.sh"
-    "$WINEPREFIX_PATH/winscr_import.sh"
-)
-
-MISSING_LOCAL=false
-if [ ! -d "$SCR_DIR" ] || [ $(find "$SCR_DIR" -maxdepth 1 -iname "*.scr" | wc -l) -eq 0 ]; then
-    MISSING_LOCAL=true
-fi
-
-if [ "$MISSING_LOCAL" = false ]; then
-    for file in "${CHECK_FILES[@]}"; do
-        if [ ! -f "$file" ]; then
-            MISSING_LOCAL=true
-            break
-        fi
-    done
-fi
-
-if [ "$MISSING_LOCAL" = true ]; then
+# --- 2. INTEGRITY AUDIT ---
+if [ ! -d "$SCR_DIR" ] || [ $(find "$SCR_DIR" -maxdepth 1 -iname "*.scr" 2>/dev/null | wc -l) -eq 0 ]; then
     if zenity --question --title="Setup" --text="Environment incomplete. Repair now?"; then
-        rm -f "$WINEPREFIX_PATH/.running"
+        rm -f ".running"
         bash /usr/share/winscreensaver/install.sh
         exit 0
     fi
-    rm -f "$WINEPREFIX_PATH/.running"
+    rm -f ".running"
     exit 0
 fi
 
-# --- 3. MENU UI ---
-SCR_SAVER=$(cat "$WINEPREFIX_PATH/scrensaver.conf" 2>/dev/null || echo "Random.scr")
-MENU_ITEMS=( FALSE "Choose Screensaver" )
-[[ "$SCR_SAVER" == "Random.scr" ]] && MENU_ITEMS+=( FALSE "Choose Random List" FALSE "Random Period" ) || MENU_ITEMS+=( FALSE "Test Screensaver" )
-MENU_ITEMS+=( FALSE "Configure Screensaver" FALSE "Lock Screen" FALSE "Timeout" FALSE "Import Screensavers (.scr)" FALSE "About" )
+# --- 3. MENU UI (Restored with Dynamic Labels) ---
+SCR_SAVER=$(cat "scrensaver.conf" 2>/dev/null || echo "Random.scr")
 
-Choice=$(zenity --list --radiolist --title="WinScreensaver" --text "Active: ${SCR_SAVER%.scr}" --column "Pick" --column "Option" "${MENU_ITEMS[@]}" --height=500 --width=420)
+# Build the menu items dynamically
+MENU_ITEMS=( FALSE "Choose Screensaver" )
+
+if [[ "$SCR_SAVER" == "Random.scr" ]]; then
+    # Mode: Random
+    TEST_LABEL="Test pool Screensavers"
+    MENU_ITEMS+=( FALSE "Choose Random List" FALSE "Random Period" )
+else
+    # Mode: Single
+    TEST_LABEL="Test Screensaver"
+fi
+
+# Add the Test option (Always visible) and the rest of the fixed menu
+MENU_ITEMS+=(
+    FALSE "$TEST_LABEL"
+    FALSE "Configure Screensaver"
+    FALSE "Lock Screen"
+    FALSE "Timeout"
+    FALSE "Import Screensavers (.scr)"
+    FALSE "About"
+)
+
+Choice=$(zenity --list --radiolist --title="WinScreensaver" \
+    --text "Active: ${SCR_SAVER%.scr}" \
+    --column "Pick" --column "Option" \
+    "${MENU_ITEMS[@]}" --height=500 --width=420)
 
 if [ -z "$Choice" ]; then
-    rm -f "$WINEPREFIX_PATH/.running"
+    rm -f ".running"
     exit 0
 fi
 
@@ -85,7 +82,7 @@ case $Choice in
     'Choose Screensaver')             ACTION="winscr_choose.sh" ;;
     'Choose Random List')             ACTION="winscr_random_choose.sh" ;;
     'Random Period')                  ACTION="winscr_random_period.sh" ;;
-    'Test Screensaver')                ACTION="winscr_test.sh" ;;
+    'Test Screensaver'|'Test pool Screensavers') ACTION="winscr_test.sh" ;;
     'Configure Screensaver')           ACTION="winscr_configure.sh" ;;
     'Timeout')                        ACTION="winscr_timeout.sh" ;;
     'Lock Screen')                    ACTION="winscr_lock.sh" ;;
@@ -94,6 +91,12 @@ case $Choice in
 esac
 
 # --- 5. UNIVERSAL HANDOVER ---
-rm -f "$WINEPREFIX_PATH/.running"
-winscreensaver &
+rm -f ".running"
+
+if [ -f "$WINEPREFIX_PATH/$ACTION" ]; then
+    bash "$WINEPREFIX_PATH/$ACTION" &
+else
+    zenity --error --text="Script not found: $WINEPREFIX_PATH/$ACTION"
+fi
+
 exit 0
