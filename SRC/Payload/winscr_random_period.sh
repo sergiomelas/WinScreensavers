@@ -15,27 +15,29 @@ echo " "
 
 WINEPREFIX_PATH="$HOME/.winscr"
 PERIOD_CONF="$WINEPREFIX_PATH/random_period.conf"
+# Default to 60 seconds if file doesn't exist
 CURRENT_VAL=$(cat "$PERIOD_CONF" 2>/dev/null || echo "60")
 
+# All values now in SECONDS
 OPTIONS=(
-    "30 seconds" 0.5
-    "2 minutes"  2
-    "5 minutes"  5
-    "10 minutes" 10
-    "15 minutes" 15
-    "30 minutes" 30
-    "1 hour"     60
+    "30 seconds" 30
+    "1 minute"   60
+    "2 minutes"  120
+    "5 minutes"  300
+    "10 minutes" 600
+    "15 minutes" 900
 )
 
 ZEN_ARGS=()
 for ((i=0; i<${#OPTIONS[@]}; i+=2)); do
     STATE="FALSE"
+    # Match the second value (the integer)
     [ "${OPTIONS[i+1]}" == "$CURRENT_VAL" ] && STATE="TRUE"
     ZEN_ARGS+=("$STATE" "${OPTIONS[i]}")
 done
 
 PICK=$(zenity --list --radiolist --title="Random Period" \
-    --text="How many minutes between screensaver changes?" \
+    --text="How many seconds/minutes between screensaver changes?" \
     --column="Pick" --column="Period" \
     "${ZEN_ARGS[@]}" --height=450 --width=350)
 
@@ -48,7 +50,6 @@ if [ -n "$PICK" ]; then
     done
 fi
 
-# --- THE UNIVERSAL HANDOVER ---
 rm -f "$WINEPREFIX_PATH/.running"
 winscreensaver &
 exit 0
