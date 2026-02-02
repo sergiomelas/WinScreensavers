@@ -1,0 +1,97 @@
+#!/bin/bash
+# filename: winscr_import.sh
+# Final version 2026 - Smart Discovery + Dynamic Width + Selective Import (FIXED NESTING)
+
+echo " "
+echo " ##################################################################"
+echo " #                                                                #"
+echo " #                Windows screensavers importer                   #"
+echo " #    Developed for X11/Wayland & KDE Plasma by sergio melas 2026 #"
+echo " #                                                                #"
+echo " ##################################################################"
+echo " "
+
+WINEPREFIX_PATH="$HOME/.winscr"
+SCR_DEST="$WINEPREFIX_PATH/drive_c/windows/system32"
+
+# --- SMART AUTO-DISCOVERY ---
+echo "Scanning home for additional screensavers..."
+BEST_FOLDER=""
+MAX_COUNT=0
+
+while read -r count_folder; do
+    count=$(echo "$count_folder" | awk '{print $1}')
+    folder=$(echo "$count_folder" | cut -d' ' -f2-)
+    if [ "$count" -gt "$MAX_COUNT" ]; then
+        MAX_COUNT=$count
+        BEST_FOLDER="$folder/"
+    fi
+done < <(find "$HOME" -maxdepth 5 -path "$WINEPREFIX_PATH" -prune -o -iname "*.scr" -exec dirname {} + 2>/dev/null | sort | uniq -c | sort -nr)
+
+# --- DYNAMIC WIDTH ---
+PATH_LEN=${#BEST_FOLDER}
+CALC_WIDTH=$(( PATH_LEN * 9 ))
+[ "$CALC_WIDTH" -lt 600 ] && CALC_WIDTH=600
+[ "$CALC_WIDTH" -gt 1200 ] && CALC_WIDTH=1200
+
+# --- PROMPT USER ---
+if [ -n "$BEST_FOLDER" ] && [ -d "$BEST_FOLDER" ]; then
+    msg="Auto-detected $MAX_COUNT screensavers in: $BEST_FOLDER. Import these Selecting Files (OK) or Browse or chancel ?"
+    SCR_SOURCE=$(zenity --file-selection --directory --filename="$BEST_FOLDER" --title="$msg" --width=$CALC_WIDTH)
+else
+    SCR_SOURCE=$(zenity --file-selection --directory --title="Select folder to import .scr files from" --width=600)
+fi
+
+# --- MAIN LOGIC BLOCK ---
+if [ -n "$SCR_SOURCE" ]; then
+    echo "[INFO] Analyzing source: $SCR_SOURCE"
+
+    # Check for Assets (DLLs/Data)
+    CRITICAL_ASSETS=$(find "$SCR_SOURCE" -maxdepth 1 -type f -not -iname "*.scr" -not -iname "*.txt" | wc -l)
+
+    if [ "$CRITICAL_ASSETS" -gt 0 ]; then
+        echo "[DEBUG] Assets found. Opening Checklist."
+        CHECKLIST_ARGS=()
+        MAX_FILE_LEN=0
+        while IFS= read -r -d '' file; do
+            CHECKLIST_ARGS+=("TRUE" "$file")
+            [ ${#file} -gt "$MAX_FILE_LEN" ] && MAX_FILE_LEN=${#file}
+        done < <(find "$SCR_SOURCE" -maxdepth 1 -type f -not -path "$SCR_SOURCE" -printf "%f\0" | sort -z)
+
+        LIST_WIDTH=$(( MAX_FILE_LEN * 10 + 200 ))
+        [ "$LIST_WIDTH" -lt 600 ] && LIST_WIDTH=600
+        [ "$LIST_WIDTH" -gt 1100 ] && LIST_WIDTH=1100
+
+        CHOICE=$(zenity --list --title="Selective Import" --width=$LIST_WIDTH --height=450 \
+            --checklist --text="Select files to import from:\n$SCR_SOURCE" \
+            --column="Pick" --column="File Name" "${CHECKLIST_ARGS[@]}" --separator="|")
+
+        # Handle Checklist Result
+        if [ $? -eq 0 ]; then
+            if [ -n "$CHOICE" ]; then
+                IFS="|" read -ra SELECTED_FILES <<< "$CHOICE"
+                for filename in "${SELECTED_FILES[@]}"; do
+                    cp -vn "$SCR_SOURCE/$filename" "$SCR_DEST/"
+                    echo "  -> Imported: $filename"
+                done
+                zenity --info --text="Imported ${#SELECTED_FILES[@]} items." --timeout=2
+            fi
+        fi
+    else
+        # Surgical Import (Only .scr)
+        echo "[INFO] Clean folder. Copying .scr only."
+        SCR_COUNT=$(find "$SCR_SOURCE" -maxdepth 1 -iname "*.scr" | wc -l)
+        if [ "$SCR_COUNT" -gt 0 ]; then
+            cp -v "$SCR_SOURCE"/*.scr "$SCR_DEST/"
+            zenity --info --text="Imported $SCR_COUNT screensaver(s)." --timeout=2
+        else
+            zenity --error --text="No .scr files found in source."
+        fi
+    fi
+fi
+
+# --- UNIVERSAL HANDOVER ---
+echo "[INFO] Restarting launcher..."
+rm -f "$WINEPREFIX_PATH/.running"
+winscreensaver &
+exit 0
