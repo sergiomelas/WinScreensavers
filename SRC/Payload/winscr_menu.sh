@@ -1,6 +1,6 @@
 #!/bin/bash
 # filename: winscr_menu.sh
-# Final version 2026 - Master Controller with Dynamic Test Labels
+# Final version 2026 - Master Controller with Strict Integrity Audit
 
 echo " "
 echo " ##################################################################"
@@ -14,10 +14,11 @@ echo " #                                                                #"
 echo " ##################################################################"
 echo " "
 
+
 WINEPREFIX_PATH="$HOME/.winscr"
 SCR_DIR="$WINEPREFIX_PATH/drive_c/windows/system32"
 
-# Move to the local directory so scripts find each other
+# Move to the local directory
 cd "$WINEPREFIX_PATH" || exit 1
 
 # --- 1. ROBUST PID-LOCK LOGIC ---
@@ -31,33 +32,70 @@ if [ -f ".running" ]; then
 fi
 echo $$ > ".running"
 
-# --- 2. INTEGRITY AUDIT ---
-if [ ! -d "$SCR_DIR" ] || [ $(find "$SCR_DIR" -maxdepth 1 -iname "*.scr" 2>/dev/null | wc -l) -eq 0 ]; then
-    if zenity --question --title="Setup" --text="Environment incomplete. Repair now?"; then
+# --- 2. MASTER INTEGRITY AUDIT (Strict No-Wildcard Check) ---
+MISSING_CRAP=0
+
+# A. CHECK DIRECTORIES
+CHECK_DIRS=("dosdevices" "drive_c")
+
+# B. CHECK CONFIGURATION & REGISTRY FILES
+CHECK_CONFIGS=(
+    "random_period.conf" "timeout.conf" "scrensaver.conf"
+    "lockscreen.conf" "userdef.reg" "system.reg" "user.reg"
+)
+
+# C. CHECK LOGIC SCRIPTS
+CHECK_SCRIPTS=(
+    "winscr_about.sh" "winscr_import.sh" "winscr_random_choose.sh" "winscr_test.sh"
+    "winscr_choose.sh" "winscr_lock.sh" "winscr_random_period.sh" "winscr_timeout.sh"
+    "winscr_configure.sh" "winscr_menu.sh" "winscr_screensaver.sh"
+)
+
+# Execute the Audit
+for dir in "${CHECK_DIRS[@]}"; do
+    if [ ! -d "$WINEPREFIX_PATH/$dir" ]; then MISSING_CRAP=1; break; fi
+done
+
+if [ "$MISSING_CRAP" -eq 0 ]; then
+    for cfg in "${CHECK_CONFIGS[@]}"; do
+        if [ ! -f "$WINEPREFIX_PATH/$cfg" ]; then MISSING_CRAP=1; break; fi
+    done
+fi
+
+if [ "$MISSING_CRAP" -eq 0 ]; then
+    for sh in "${CHECK_SCRIPTS[@]}"; do
+        if [ ! -f "$WINEPREFIX_PATH/$sh" ]; then MISSING_CRAP=1; break; fi
+    done
+fi
+
+# Check for .scr presence
+SCR_COUNT=$(find "$SCR_DIR" -maxdepth 1 -iname "*.scr" 2>/dev/null | wc -l)
+if [ "$SCR_COUNT" -eq 0 ]; then MISSING_CRAP=1; fi
+
+# Rebuild Trigger
+if [ "$MISSING_CRAP" -eq 1 ]; then
+    if zenity --question --title="Integrity Failure" \
+       --text="Missing registry files, scripts, or screensavers detected.\n\nRebuild environment now?" --width=400; then
         rm -f ".running"
         bash /usr/share/winscreensaver/install.sh
         exit 0
+    else
+        rm -f ".running"
+        exit 1
     fi
-    rm -f ".running"
-    exit 0
 fi
 
-# --- 3. MENU UI (Restored with Dynamic Labels) ---
+# --- 3. MENU UI ---
 SCR_SAVER=$(cat "scrensaver.conf" 2>/dev/null || echo "Random.scr")
-
-# Build the menu items dynamically
 MENU_ITEMS=( FALSE "Choose Screensaver" )
 
 if [[ "$SCR_SAVER" == "Random.scr" ]]; then
-    # Mode: Random
     TEST_LABEL="Test pool Screensavers"
     MENU_ITEMS+=( FALSE "Choose Random List" FALSE "Random Period" )
 else
-    # Mode: Single
     TEST_LABEL="Test Screensaver"
 fi
 
-# Add the Test option (Always visible) and the rest of the fixed menu
 MENU_ITEMS+=(
     FALSE "$TEST_LABEL"
     FALSE "Configure Screensaver"
@@ -92,11 +130,9 @@ esac
 
 # --- 5. UNIVERSAL HANDOVER ---
 rm -f ".running"
-
 if [ -f "$WINEPREFIX_PATH/$ACTION" ]; then
     bash "$WINEPREFIX_PATH/$ACTION" &
 else
-    zenity --error --text="Script not found: $WINEPREFIX_PATH/$ACTION"
+    zenity --error --text="Script missing: $ACTION"
 fi
-
 exit 0
