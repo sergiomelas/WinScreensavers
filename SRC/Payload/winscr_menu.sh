@@ -129,7 +129,7 @@ case $Choice in
 esac
 
 # --- 5. UNIVERSAL HANDOVER ---
-rm -f ".running"
+rm -f "$WINEPREFIX_PATH/.running"
 if [ -f "$WINEPREFIX_PATH/$ACTION" ]; then
     bash "$WINEPREFIX_PATH/$ACTION" &
 else
