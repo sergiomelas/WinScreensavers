@@ -61,6 +61,20 @@ is_screen_locked() {
     [[ "$locked" == "true" ]] && return 0 || return 1
 }
 
+is_video_engine_active() {
+    # 1. D-Bus Inhibit (Browsers/YouTube)
+    local dbus_inhibit=$(qdbus6 org.freedesktop.PowerManagement.Inhibit /org/freedesktop/PowerManagement/Inhibit HasInhibit 2>/dev/null || \
+                         qdbus org.freedesktop.PowerManagement.Inhibit /org/freedesktop/PowerManagement/Inhibit HasInhibit 2>/dev/null)
+    if [[ "$dbus_inhibit" == "true" ]]; then return 0; fi
+
+    # 2. Pipewire Node Check (Targeting browsers/media players)
+    if command -v pw-dump >/dev/null; then
+        local VideoActive=$(pw-dump | grep -E "node.name.*(firefox|chrome|brave|vlc|mpv)" -A 15 | grep -c "running")
+        if [ "$VideoActive" -gt 0 ]; then return 0; fi
+    fi
+    return 1
+}
+
 # --- THE LAUNCHER ---
 trigger_cmd() {
     local VALID_ARRAY=()
@@ -116,7 +130,14 @@ trigger_cmd() {
                 break
             fi
         done
-    done
+        LockSc=$( cat $HOME/.winscr/lockscreen.conf )
+        SysLockSc=$( /usr/lib/qt6/bin/qdbus org.freedesktop.ScreenSaver /org/freedesktop/ScreenSaver GetActive ) #get status of kde lockscreen after scrrensaver exits
+        if [[ "$SysLockSc" == *false* ]]; then #If  kde didnt alredy losked the screen
+            if [ $LockSc -gt '0' ]; then #if asked lock screen
+                loginctl lock-session
+            fi
+        fi
+     done
 }
 
 # --- MAIN LOOP ---
@@ -127,7 +148,7 @@ while true; do
     SCR_TIMEOUT_RAW=$(cat "$WINEPREFIX_PATH/timeout.conf" 2>/dev/null || echo 30)
     SCR_TIMEOUT=${SCR_TIMEOUT_RAW%.*}
 
-    if is_user_active_now || is_screen_locked; then
+    if is_user_active_now || is_screen_locked || is_video_engine_active; then
         APP_TIMER=0
     fi
 
