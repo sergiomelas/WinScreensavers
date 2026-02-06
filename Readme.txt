@@ -1,11 +1,11 @@
 ##################################################################
 ##################################################################
-###           Windows Screensavers for Linux                   ###
-### Developed by sergio melas (sergiomelas@gmail.com) 2026     ###
+###          Windows(c) Screensavers for Linux                 ###
+###   Developed by sergio melas (sergiomelas@gmail.com) 2026   ###
 ##################################################################
 ##################################################################
 
-This collection of scripts implements the usage of Windows screensavers (.scr) in KDE Plasma (X11 & Wayland) with a clean interface and automated background management.
+This collection of scripts implements the usage of Windows(c) screensavers (.scr) in KDE Plasma (X11 & Wayland) with a clean interface and automated background management.
 
 Current Setup Features:
 - Debian Package (.deb) for easy system-wide installation.
@@ -35,6 +35,7 @@ WINEPREFIX=/home/$USER/.winscr wine <path_to_installer.exe>
 Note: To ensure the screensaver triggers correctly, set your "Screen Locking" and "Power Management" (Screen Energy Saving) timeouts to be LARGER than the screensaver timeout set in the WinScreensaver menu.
 
 Latest Version: https://github.com/sergiomelas/WinScreensavers
+Good Source for Windows(c) screesavers: https://www.screensaversplanet.com/screensavers/windows
 
 ##################################################################################################################
 Change log:
