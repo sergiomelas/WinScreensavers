@@ -78,15 +78,48 @@ is_video_engine_active() {
 # --- THE LAUNCHER ---
 trigger_cmd() {
     local VALID_ARRAY=()
-    while IFS= read -r -d '' file; do
-        VALID_ARRAY+=("$file")
-    done < <(find "$SCR_DIR" -maxdepth 1 -iname "*.scr" -print0 2>/dev/null)
+    local RANDOM_CONF="$WINEPREFIX_PATH/random_list.conf"
+
+    # Check if the user has a specific list saved from winscr_random_choose.sh
+    if [[ -f "$RANDOM_CONF" ]] && [[ -s "$RANDOM_CONF" ]]; then
+        echo "[DEBUG] Using custom random pool from random_list.conf"
+        while IFS= read -r line; do
+            # Ensure the file actually exists before adding to pool
+            if [[ -f "$SCR_DIR/$line" ]]; then
+                VALID_ARRAY+=("$SCR_DIR/$line")
+            fi
+        done < "$RANDOM_CONF"
+    else
+        # Fallback: Use everything in System32 if no list is defined
+        echo "[DEBUG] No random list found. Using all available screensavers."
+        while IFS= read -r -d '' file; do
+            VALID_ARRAY+=("$file")
+        done < <(find "$SCR_DIR" -maxdepth 1 -iname "*.scr" -print0 2>/dev/null)
+    fi
 
     [[ ${#VALID_ARRAY[@]} -eq 0 ]] && return
 
+    # ... rest of your OLD_PID / NEW_PID logic remains exactly the same ...
+
     local OLD_PID=""
+    local NEW_PID="" # Explicitly declare both here
+
     while true; do
-        if is_user_active_now || is_screen_locked; then break; fi
+        if is_user_active_now || is_screen_locked; then  #Kill screesavers if lock screen
+            echo -e "\n[$(date +%H:%M:%S)] STOP: Activity or Lock detected."
+            # Kill the current screensaver
+            kill "$NEW_PID" 2>/dev/null
+            sleep 0.5
+            kill -9 "$NEW_PID" 2>/dev/null
+
+            # Kill the transition screensaver if it exists
+            if [[ -n "$OLD_PID" ]]; then
+               kill "$OLD_PID" 2>/dev/null
+               sleep 0.5
+               kill -9 "$OLD_PID" 2>/dev/null
+            fi
+            break 2
+        fi
 
         local CURRENT_SCR="${VALID_ARRAY[$(( RANDOM % ${#VALID_ARRAY[@]} ))]}"
         echo -e "\n[$(date +%H:%M:%S)] LAUNCHING: $(basename "$CURRENT_SCR")"
