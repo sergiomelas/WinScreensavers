@@ -13,19 +13,13 @@ echo " #                                                                #"
 echo " ##################################################################"
 echo " "
 
-# --- HELPER: STANDARDIZED RELAUNCH (Fixed Syntax) ---
+# --- HELPER: STANDARDIZED RELAUNCH ---
 relaunch_menu() {
     rm -f "$WINEPREFIX_PATH/.running"
-    KSRT_EXE=$(command -v kstart6 || command -v kstart5 || command -v kstart)
     if command -v winscreensaver >/dev/null; then
-        LAUNCH_CMD="winscreensaver"
+        winscreensaver &
     else
-        LAUNCH_CMD="bash $WINEPREFIX_PATH/winscr_menu.sh"
-    fi
-    if [ -n "$KSRT_EXE" ]; then
-        $KSRT_EXE $LAUNCH_CMD &
-    else
-        $LAUNCH_CMD &
+        bash "$WINEPREFIX_PATH/winscr_menu.sh" &
     fi
 }
 

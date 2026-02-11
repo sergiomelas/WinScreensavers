@@ -17,6 +17,16 @@ echo " "
 WINEPREFIX_PATH="$HOME/.winscr"
 CURRENT_TIM=$(cat "$WINEPREFIX_PATH/timeout.conf" 2>/dev/null || echo "600")
 
+# --- HELPER: STANDARDIZED RELAUNCH ---
+relaunch_menu() {
+    rm -f "$WINEPREFIX_PATH/.running"
+    if command -v winscreensaver >/dev/null; then
+        winscreensaver &
+    else
+        bash "$WINEPREFIX_PATH/winscr_menu.sh" &
+    fi
+}
+
 # --- 2. DEFINE BULLET OPTIONS ---
 OPTIONS=(
     "30 seconds" 30
@@ -55,7 +65,7 @@ if [ -n "$PICK" ]; then
     # (Detection code for power settings to avoid monitor sleep before scr)
 fi
 
-# --- 6. THE UNIVERSAL HANDOVER ---
-rm -f "$WINEPREFIX_PATH/.running"
-winscreensaver &
+# 5. FINAL TERMINATION
+relaunch_menu
 exit 0
+

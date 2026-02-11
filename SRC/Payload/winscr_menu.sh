@@ -48,7 +48,7 @@ CHECK_CONFIGS=(
 CHECK_SCRIPTS=(
     "winscr_about.sh" "winscr_import.sh" "winscr_random_choose.sh" "winscr_test.sh"
     "winscr_choose.sh" "winscr_lock.sh" "winscr_random_period.sh" "winscr_timeout.sh"
-    "winscr_configure.sh" "winscr_menu.sh" "winscr_screensaver.sh"
+    "winscr_configure.sh" "winscr_menu.sh" "winscr_screensaver.sh" "winscr_remove.sh"
 )
 
 # Execute the Audit
@@ -102,6 +102,7 @@ MENU_ITEMS+=(
     FALSE "Lock Screen"
     FALSE "Timeout"
     FALSE "Import Screensavers (.scr)"
+    FALSE "Remove Screensavers (.scr)"
     FALSE "About"
 )
 
@@ -126,6 +127,7 @@ case $Choice in
     'Lock Screen')                    ACTION="winscr_lock.sh" ;;
     'About')                          ACTION="winscr_about.sh" ;;
     'Import Screensavers (.scr)')     ACTION="winscr_import.sh" ;;
+    'Remove Screensavers (.scr)')     ACTION="winscr_remove.sh" ;;
 esac
 
 # --- 5. UNIVERSAL HANDOVER ---

@@ -52,6 +52,7 @@ Change log:
  -V3.0    31-01-2026: Implemented Debian Builder, global icon registration, fixed root-permission issues,
                       space-proof intelligent folder discovery, and absolute pathing for reliable autostart.
  -V3.1    08-02-2026: Full support for Wayland is operational and debugged
+ -V3.2    11-02-2026: Added remove screensaver code cleaning
 
 Thx to Christitus for the inspirational post: https://www.youtube.com/watch?v=J2zasJz5vuA&t=384s
 on youtube and the info below I used to create this:

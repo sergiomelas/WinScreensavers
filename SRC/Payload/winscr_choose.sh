@@ -18,6 +18,16 @@ WINEPREFIX_PATH="$HOME/.winscr"
 SCR_DIR="$WINEPREFIX_PATH/drive_c/windows/system32"
 CONF_FILE="$WINEPREFIX_PATH/scrensaver.conf"
 
+# --- HELPER: STANDARDIZED RELAUNCH ---
+relaunch_menu() {
+    rm -f "$WINEPREFIX_PATH/.running"
+    if command -v winscreensaver >/dev/null; then
+        winscreensaver &
+    else
+        bash "$WINEPREFIX_PATH/winscr_menu.sh" &
+    fi
+}
+
 # --- 1. SCAN FOR SCREENSAVERS ---
 readarray -t array < <(find "$SCR_DIR" -maxdepth 1 -iname "*.scr" -printf "%f\n" | sort 2>/dev/null)
 
@@ -64,7 +74,7 @@ if [ -n "$Choice" ]; then
     echo "$Choice" > "$CONF_FILE"
 fi
 
-# --- 6. UNIVERSAL HANDOVER ---
-rm -f "$WINEPREFIX_PATH/.running"
-winscreensaver &
+# 5. FINAL TERMINATION
+relaunch_menu
 exit 0
+

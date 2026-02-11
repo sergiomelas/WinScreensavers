@@ -14,6 +14,16 @@ echo " "
 WINEPREFIX_PATH="$HOME/.winscr"
 SCR_DEST="$WINEPREFIX_PATH/drive_c/windows/system32"
 
+# --- HELPER: STANDARDIZED RELAUNCH ---
+relaunch_menu() {
+    rm -f "$WINEPREFIX_PATH/.running"
+    if command -v winscreensaver >/dev/null; then
+        winscreensaver &
+    else
+        bash "$WINEPREFIX_PATH/winscr_menu.sh" &
+    fi
+}
+
 # --- SMART AUTO-DISCOVERY ---
 echo "Scanning home for additional screensavers..."
 BEST_FOLDER=""
@@ -90,8 +100,7 @@ if [ -n "$SCR_SOURCE" ]; then
     fi
 fi
 
-# --- UNIVERSAL HANDOVER ---
-echo "[INFO] Restarting launcher..."
-rm -f "$WINEPREFIX_PATH/.running"
-winscreensaver &
+# 5. FINAL TERMINATION
+relaunch_menu
 exit 0
+

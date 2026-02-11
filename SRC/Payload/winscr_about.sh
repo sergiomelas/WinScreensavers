@@ -17,7 +17,17 @@ WINEPREFIX_PATH="$HOME/.winscr"
 SYS_PAYLOAD="/usr/share/winscreensaver/Payload"
 GITHUB_REPO="sergiomelas/WinScreensavers"
 GITHUB_URL="https://github.com/$GITHUB_REPO"
-CURRENT_VER="3.1"
+CURRENT_VER="3.2"
+
+# --- HELPER: STANDARDIZED RELAUNCH ---
+relaunch_menu() {
+    rm -f "$WINEPREFIX_PATH/.running"
+    if command -v winscreensaver >/dev/null; then
+        winscreensaver &
+    else
+        bash "$WINEPREFIX_PATH/winscr_menu.sh" &
+    fi
+}
 
 # Added "Check for Update" as a third extra button
 RESPONSE=$(zenity --info --title="About WinScreensaver" \
@@ -67,7 +77,7 @@ elif [ "$RESPONSE" = "Refresh Installation" ]; then
     fi
 fi
 
-# --- THE UNIVERSAL HANDOVER ---
-rm -f "$WINEPREFIX_PATH/.running"
-winscreensaver &
+# 5. FINAL TERMINATION
+relaunch_menu
 exit 0
+

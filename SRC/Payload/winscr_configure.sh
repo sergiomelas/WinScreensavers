@@ -18,6 +18,16 @@ WINEPREFIX_PATH="$HOME/.winscr"
 SCR_DIR="$WINEPREFIX_PATH/drive_c/windows/system32"
 export WINEPREFIX="$WINEPREFIX_PATH"
 
+# --- HELPER: STANDARDIZED RELAUNCH ---
+relaunch_menu() {
+    rm -f "$WINEPREFIX_PATH/.running"
+    if command -v winscreensaver >/dev/null; then
+        winscreensaver &
+    else
+        bash "$WINEPREFIX_PATH/winscr_menu.sh" &
+    fi
+}
+
 # 1. READ ACTIVE SELECTION
 SCR_SAVER=$(cat "$WINEPREFIX_PATH/scrensaver.conf" 2>/dev/null || echo "Random.scr")
 
@@ -63,6 +73,7 @@ if [ -f "$SCR_DIR/$TARGET_SCR" ]; then
     WINEDEBUG=-all wine "$SCR_DIR/$TARGET_SCR" /c
 fi
 
-# --- 4. THE UNIVERSAL HANDOVER ---
-winscreensaver &
+# 5. FINAL TERMINATION
+relaunch_menu
 exit 0
+

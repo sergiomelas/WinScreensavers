@@ -18,6 +18,16 @@ PERIOD_CONF="$WINEPREFIX_PATH/random_period.conf"
 # Default to 60 seconds if file doesn't exist
 CURRENT_VAL=$(cat "$PERIOD_CONF" 2>/dev/null || echo "60")
 
+# --- HELPER: STANDARDIZED RELAUNCH ---
+relaunch_menu() {
+    rm -f "$WINEPREFIX_PATH/.running"
+    if command -v winscreensaver >/dev/null; then
+        winscreensaver &
+    else
+        bash "$WINEPREFIX_PATH/winscr_menu.sh" &
+    fi
+}
+
 # All values now in SECONDS
 OPTIONS=(
     "30 seconds" 30
@@ -50,6 +60,7 @@ if [ -n "$PICK" ]; then
     done
 fi
 
-rm -f "$WINEPREFIX_PATH/.running"
-winscreensaver &
+# 5. FINAL TERMINATION
+relaunch_menu
 exit 0
+

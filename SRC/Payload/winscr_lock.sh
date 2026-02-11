@@ -16,6 +16,16 @@ echo  " "
 # --- 1. PATH DETECTION ---
 WINEPREFIX_PATH="$HOME/.winscr"
 
+# --- HELPER: STANDARDIZED RELAUNCH ---
+relaunch_menu() {
+    rm -f "$WINEPREFIX_PATH/.running"
+    if command -v winscreensaver >/dev/null; then
+        winscreensaver &
+    else
+        bash "$WINEPREFIX_PATH/winscr_menu.sh" &
+    fi
+}
+
 # --- 2. READ CONFIGURATION ---
 LockS=$(cat "$WINEPREFIX_PATH/lockscreen.conf" 2>/dev/null || echo "0")
 
@@ -48,10 +58,7 @@ else
     LAUNCH_CMD="bash $WINEPREFIX_PATH/winscr_menu.sh"
 fi
 
-if [ -n "$KSRT_EXE" ]; then
-    $KSRT_EXE $LAUNCH_CMD &
-else
-    $LAUNCH_CMD &
-fi
-
+# 5. FINAL TERMINATION
+relaunch_menu
 exit 0
+
