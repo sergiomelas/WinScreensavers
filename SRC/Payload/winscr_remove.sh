@@ -1,6 +1,5 @@
 #!/bin/bash
 # filename: winscr_remove.sh
-# Purpose: Scan and safely uninstall selected Windows screensavers
 
 echo " "
 echo " ##################################################################"
@@ -34,16 +33,14 @@ if [[ ${#files[@]} -eq 0 ]]; then
     exit 0
 fi
 
-# 2. Build Zenity Checklist (Hiding the .scr extension for the user)
+# 2. Build Zenity Checklist
 ZEN_ARGS=()
 for f in "${files[@]}"; do
-    # Strip the .scr extension for display
     display_name="${f%.*}"
     ZEN_ARGS+=("FALSE" "$display_name")
 done
 
 # 3. Open the removal list
-# We use the display names, then re-add .scr when processing deletion
 SELECTED_NAMES=$(zenity --list --checklist \
     --title="Uninstall Screensavers" \
     --text="Select the screensavers you want to PERMANENTLY delete:" \
@@ -55,7 +52,15 @@ if [[ -n "$SELECTED_NAMES" ]]; then
     # Count selections
     COUNT=$(echo "$SELECTED_NAMES" | wc -l)
 
-    zenity --question --text="Are you sure you want to delete $COUNT screensavers?\nThis cannot be undone." --width=300
+    # Prepare the list for the confirmation popup (replacing newlines with bullet points)
+    PREVIEW_LIST=$(echo "$SELECTED_NAMES" | sed 's/^/• /')
+
+
+
+    zenity --question --title="Confirm Deletion" \
+    --text="You have selected $COUNT screensaver(s) for removal:\n\n$PREVIEW_LIST\n\nAre you sure you want to delete these? This cannot be undone." \
+    --width=400
+
     if [[ $? -eq 0 ]]; then
         while IFS= read -r name; do
             [[ -z "$name" ]] && continue
