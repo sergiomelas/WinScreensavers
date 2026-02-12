@@ -1,11 +1,11 @@
 #!/bin/bash
 # filename: winscr_import.sh
-# Final version 2026 - Smart Discovery + Dynamic Width + Selective Import (FIXED NESTING)
+# Final version 2026 - Smart Discovery + Selective Extension Correction (Preserves Name Case)
 
 echo " "
 echo " ##################################################################"
 echo " #                                                                #"
-echo " #                Windows screensavers importer                   #"
+echo " #                 Windows screensavers importer                  #"
 echo " #    Developed for X11/Wayland & KDE Plasma by sergio melas 2026 #"
 echo " #                                                                #"
 echo " ##################################################################"
@@ -46,7 +46,7 @@ CALC_WIDTH=$(( PATH_LEN * 9 ))
 
 # --- PROMPT USER ---
 if [ -n "$BEST_FOLDER" ] && [ -d "$BEST_FOLDER" ]; then
-    msg="Auto-detected $MAX_COUNT screensavers in: $BEST_FOLDER. Import these Selecting Files (OK) or Browse or chancel ?"
+    msg="Auto-detected $MAX_COUNT screensavers in: $BEST_FOLDER. Import these Selecting Files (OK) or Browse or cancel?"
     SCR_SOURCE=$(zenity --file-selection --directory --filename="$BEST_FOLDER" --title="$msg" --width=$CALC_WIDTH)
 else
     SCR_SOURCE=$(zenity --file-selection --directory --title="Select folder to import .scr files from" --width=600)
@@ -77,23 +77,39 @@ if [ -n "$SCR_SOURCE" ]; then
             --column="Pick" --column="File Name" "${CHECKLIST_ARGS[@]}" --separator="|")
 
         # Handle Checklist Result
-        if [ $? -eq 0 ]; then
-            if [ -n "$CHOICE" ]; then
-                IFS="|" read -ra SELECTED_FILES <<< "$CHOICE"
-                for filename in "${SELECTED_FILES[@]}"; do
-                    cp -vn "$SCR_SOURCE/$filename" "$SCR_DEST/"
-                    echo "  -> Imported: $filename"
-                done
-                zenity --info --text="Imported ${#SELECTED_FILES[@]} items." --timeout=2
-            fi
+        if [ $? -eq 0 ] && [ -n "$CHOICE" ]; then
+            IFS="|" read -ra SELECTED_FILES <<< "$CHOICE"
+            for filename in "${SELECTED_FILES[@]}"; do
+                # EXTENSION-ONLY NORMALIZATION: Keep name, lowercase extension
+                ext="${filename##*.}"
+                base="${filename%.*}"
+                target_name="${base}.${ext,,}"
+
+                cp -vn "$SCR_SOURCE/$filename" "$SCR_DEST/$target_name"
+                echo "  -> Imported: $filename as $target_name"
+            done
+            zenity --info --text="Imported ${#SELECTED_FILES[@]} items (Fixed .scr extension)." --timeout=2
         fi
     else
         # Surgical Import (Only .scr)
-        echo "[INFO] Clean folder. Copying .scr only."
-        SCR_COUNT=$(find "$SCR_SOURCE" -maxdepth 1 -iname "*.scr" | wc -l)
+        echo "[INFO] Clean folder. Fixing extensions while preserving names."
+        SCR_COUNT=0
+
+        while IFS= read -r -d '' full_path; do
+            filename=$(basename "$full_path")
+
+            # EXTENSION-ONLY NORMALIZATION
+            ext="${filename##*.}"
+            base="${filename%.*}"
+            target_name="${base}.${ext,,}"
+
+            cp -vn "$full_path" "$SCR_DEST/$target_name"
+            ((SCR_COUNT++))
+            echo "  -> Normalized: $filename -> $target_name"
+        done < <(find "$SCR_SOURCE" -maxdepth 1 -iname "*.scr" -print0)
+
         if [ "$SCR_COUNT" -gt 0 ]; then
-            cp -v "$SCR_SOURCE"/*.scr "$SCR_DEST/"
-            zenity --info --text="Imported $SCR_COUNT screensaver(s)." --timeout=2
+            zenity --info --text="Imported $SCR_COUNT screensaver(s) with fixed extensions." --timeout=2
         else
             zenity --error --text="No .scr files found in source."
         fi
@@ -103,4 +119,3 @@ fi
 # 5. FINAL TERMINATION
 relaunch_menu
 exit 0
-
