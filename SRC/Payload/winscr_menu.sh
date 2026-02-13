@@ -5,11 +5,11 @@
 echo " "
 echo " ##################################################################"
 echo " #                                                                #"
-echo " #                        Choose Option Menu                      #"
+echo " #                 Choose Option Menu                             #"
 echo " #    Developed for X11/Wayland & KDE Plasma by sergio melas 2026 #"
 echo " #                                                                #"
-echo " #                Email: sergiomelas@gmail.com                    #"
-echo " #                   Released under GPL V2.0                      #"
+echo " #                 Email: sergiomelas@gmail.com                   #"
+echo " #                    Released under GPL V2.0                     #"
 echo " #                                                                #"
 echo " ##################################################################"
 echo " "
@@ -90,8 +90,8 @@ SCR_SAVER=$(cat "scrensaver.conf" 2>/dev/null || echo "Random.scr")
 MENU_ITEMS=( FALSE "Choose Screensaver" )
 
 if [[ "$SCR_SAVER" == "Random.scr" ]]; then
-    TEST_LABEL="Test pool Screensavers"
-    MENU_ITEMS+=( FALSE "Choose Random List" FALSE "Random Period" )
+    TEST_LABEL="Test Pool Screensavers"
+    MENU_ITEMS+=( FALSE "Choose Random List Pool" FALSE "Pool Random Switch Period" )
 else
     TEST_LABEL="Test Screensaver"
 fi
@@ -99,11 +99,11 @@ fi
 MENU_ITEMS+=(
     FALSE "$TEST_LABEL"
     FALSE "Configure Screensaver"
-    FALSE "Lock Screen"
-    FALSE "Timeout"
-    FALSE "Import Screensavers (.scr)"
-    FALSE "Remove Screensavers (.scr)"
-    FALSE "About"
+    FALSE "Lock Screen Configuration"
+    FALSE "Screensaver Activation Timeout"
+    FALSE "Import Screensavers Files"
+    FALSE "Remove Screensavers Files"
+    FALSE "About and Updates"
 )
 
 Choice=$(zenity --list --radiolist --title="WinScreensaver" \
@@ -118,16 +118,16 @@ fi
 
 # --- 4. ACTION DISPATCHER ---
 case $Choice in
-    'Choose Screensaver')             ACTION="winscr_choose.sh" ;;
-    'Choose Random List')             ACTION="winscr_random_choose.sh" ;;
-    'Random Period')                  ACTION="winscr_random_period.sh" ;;
-    'Test Screensaver'|'Test pool Screensavers') ACTION="winscr_test.sh" ;;
-    'Configure Screensaver')           ACTION="winscr_configure.sh" ;;
-    'Timeout')                        ACTION="winscr_timeout.sh" ;;
-    'Lock Screen')                    ACTION="winscr_lock.sh" ;;
-    'About')                          ACTION="winscr_about.sh" ;;
-    'Import Screensavers (.scr)')     ACTION="winscr_import.sh" ;;
-    'Remove Screensavers (.scr)')     ACTION="winscr_remove.sh" ;;
+    'Choose Screensaver')               ACTION="winscr_choose.sh" ;;
+    'Choose Random List Pool')          ACTION="winscr_random_choose.sh" ;;
+    'Pool Random Switch Period')        ACTION="winscr_random_period.sh" ;;
+    'Test Screensaver'|'Test Pool Screensavers') ACTION="winscr_test.sh" ;;
+    'Configure Screensaver')            ACTION="winscr_configure.sh" ;;
+    'Screensaver Activation Timeout')   ACTION="winscr_timeout.sh" ;;
+    'Lock Screen Configuration')        ACTION="winscr_lock.sh" ;;
+    'About and Updates')                ACTION="winscr_about.sh" ;;
+    'Import Screensavers Files')        ACTION="winscr_import.sh" ;;
+    'Remove Screensavers Files')        ACTION="winscr_remove.sh" ;;
 esac
 
 # --- 5. UNIVERSAL HANDOVER ---
