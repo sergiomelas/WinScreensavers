@@ -29,6 +29,7 @@ relaunch_menu() {
 
 # --- 2. DEFINE BULLET OPTIONS ---
 OPTIONS=(
+    "10 seconds" 10
     "30 seconds" 30
     "2 minutes"  120
     "5 minutes"  300

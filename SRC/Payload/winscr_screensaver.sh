@@ -94,7 +94,7 @@ trigger_cmd() {
 
         local ROT_TIMER=0
         local ROT_RAW=$(get_cached_config "$WINEPREFIX_PATH/random_period.conf" "1")
-        local ROT_TARGET=$(( ROT_RAW == 0 ? 30 : ROT_RAW * 60 ))
+        local ROT_TARGET=$(( ROT_RAW == 0 ? 30 : ROT_RAW ))
 
         while true; do
             sleep 1
