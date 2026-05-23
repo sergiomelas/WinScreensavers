@@ -16,7 +16,7 @@ echo " ##################################################################"
 echo " "
 
 PACKAGE_NAME="winscreensaver"
-VERSION="4.0"
+VERSION="3.3"
 BUILD_ROOT="./${PACKAGE_NAME}_${VERSION}"
 
 # 1. CLEAN & PREPARE

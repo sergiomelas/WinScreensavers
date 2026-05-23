@@ -9,17 +9,19 @@ FieldLines.scr
 Flux.scr
 Helios.scr
 Hyperspace.scr
+kaleidoscope.scr
 Lattice.scr
-Matrix
+Matrix Code.scr
 Microcosm.scr
+MinecraftPlus.scr
 Mystify.scr
 Pipes.scr
-pippo.txt
 Ribbons.scr
-RollerCoasterScreenSaver
+RollerCoaster2000.scr
 Science.scr
 Sea.scr
 SolarWinds.scr
 Space.scr
 Star Trek 3D Starships.scr
+Voyager.scr
 Windows 98.scr

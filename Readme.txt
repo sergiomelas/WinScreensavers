@@ -56,6 +56,15 @@ Change log:
                       Added winscr_remove.sh for safe uninstallation with
                       bulleted confirmation lists and automatic pool cleanup.
                       Optimized session detection using loginctl for zero-lag.
+- V4.0    23-05-2026: Fixed critical engine bugs and optimized runtime stability.
+                      Resolved an issue where random mode ignored the custom checklist pool.
+                      Fixed a collision bug where consecutive selections of the same screensaver
+                      failed under Wine, exposing the naked desktop; implemented a mathematical
+                      step-and-wrap deduplication algorithm to guarantee seamless transitions.
+                      Upgraded core rotation monitoring loop to high-frequency 10Hz (0.1s sleep)
+                      with an active 'Anti-Hole' pgrep interceptor to eliminate visual desktop exposure
+                      caused by silent Wine crashes. Enforced a hard minimum barrier of 2 screensavers
+                      within the Zenity selection menu to prevent engine deadlocks.
 
 Thx to Christitus for the inspirational post: https://www.youtube.com/watch?v=J2zasJz5vuA&t=384s
 on youtube and the info below I used to create this:
