@@ -1,11 +1,11 @@
 #!/bin/bash
 # filename: winscr_import.sh
-# Final version 2026 - Smart Discovery + Selective Extension Correction (Preserves Name Case)
+# Final version 2026 - Smart Discovery + Selective Extension Correction + Sandbox QA
 
 echo " "
 echo " ##################################################################"
 echo " #                                                                #"
-echo " #                 Windows screensavers importer                  #"
+echo " #                  Windows screensavers importer                 #"
 echo " #    Developed for X11/Wayland & KDE Plasma by sergio melas 2026 #"
 echo " #                                                                #"
 echo " ##################################################################"
@@ -16,106 +16,169 @@ SCR_DEST="$WINEPREFIX_PATH/drive_c/windows/system32"
 
 # --- HELPER: STANDARDIZED RELAUNCH ---
 relaunch_menu() {
+    # 1. Clean the lock file so the new menu can start
     rm -f "$WINEPREFIX_PATH/.running"
-    if command -v winscreensaver >/dev/null; then
-        winscreensaver &
-    else
-        bash "$WINEPREFIX_PATH/winscr_menu.sh" &
+
+    # 2. Heal the Daemon (Only if not already running)
+    if ! pgrep -f "winscr_screensaver.sh" >/dev/null; then
+        pkill -f "winscreensaver" 2>/dev/null
+        wineserver -k 2>/dev/null
+        sleep 0.5
+        bash "$WINEPREFIX_PATH/winscr_screensaver.sh" &
     fi
+
+    # 3. Always launch the menu script directly
+    # This ignores the 'winscreensaver' command check and uses your script
+    bash "$WINEPREFIX_PATH/winscr_menu.sh" &
+
+    # 4. Exit
+    exit 0
 }
 
-# --- SMART AUTO-DISCOVERY ---
-echo "Scanning home for additional screensavers..."
-BEST_FOLDER=""
-MAX_COUNT=0
+# --- QA TESTER (Surgical) ---
+test_screensaver() {
+    local screen_path="$1"
+    local proc_base=$(basename "$screen_path")
+    local retries=1
 
-while read -r count_folder; do
-    count=$(echo "$count_folder" | awk '{print $1}')
-    folder=$(echo "$count_folder" | cut -d' ' -f2-)
-    if [ "$count" -gt "$MAX_COUNT" ]; then
-        MAX_COUNT=$count
-        BEST_FOLDER="$folder/"
-    fi
-done < <(find "$HOME" -maxdepth 5 -path "$WINEPREFIX_PATH" -prune -o -iname "*.scr" -exec dirname {} + 2>/dev/null | sort | uniq -c | sort -nr)
+    while [ $retries -gt 0 ]; do
+        # 1. Launch wine and capture PID
+        wine "$screen_path" /s >/dev/null 2>&1 &
+        local test_pid=$!
+        sleep 3 # Give it time to initialize
 
-# --- DYNAMIC WIDTH ---
-PATH_LEN=${#BEST_FOLDER}
-CALC_WIDTH=$(( PATH_LEN * 9 ))
-[ "$CALC_WIDTH" -lt 600 ] && CALC_WIDTH=600
-[ "$CALC_WIDTH" -gt 1200 ] && CALC_WIDTH=1200
+        # 2. SESSION-SPECIFIC DETECTION
+        if [[ "$XDG_SESSION_TYPE" == "wayland" ]]; then
+            local is_visible="NO"
+            # Wayland: Query KWin via D-Bus
+            if qdbus org.kde.KWin /KWin org.kde.KWin.queryWindowInfo 2>/dev/null | grep -q "pid: $test_pid"; then
+                is_visible="YES"
+            fi
 
-# --- PROMPT USER ---
-if [ -n "$BEST_FOLDER" ] && [ -d "$BEST_FOLDER" ]; then
-    msg="Auto-detected $MAX_COUNT screensavers in: $BEST_FOLDER. Import these Selecting Files (OK) or Browse or cancel?"
-    SCR_SOURCE=$(zenity --file-selection --directory --filename="$BEST_FOLDER" --title="$msg" --width=$CALC_WIDTH)
-else
-    SCR_SOURCE=$(zenity --file-selection --directory --title="Select folder to import .scr files from" --width=600)
-fi
+            # 3. SURGICAL CLEANUP
+            kill -9 "$test_pid" 2>/dev/null
+            pkill -9 -P "$test_pid" 2>/dev/null
+            wineserver -k 2>/dev/null
+
+            # 4. DECISION
+            if [[ "$is_visible" == "YES" ]]; then
+                return 0 # Validated!
+            fi
+        else
+            local log_file="/tmp/wine_test.log"
+            export DISPLAY=:0
+            export WAYLAND_DISPLAY=$WAYLAND_DISPLAY
+            export XDG_RUNTIME_DIR=$XDG_RUNTIME_DIR
+
+            # Detection: If process is dead OR if there is an error window
+            if ! pgrep -f "$proc_base" >/dev/null || wmctrl -l 2>/dev/null | grep -qi "Program Error"; then
+                pkill -f "$proc_base" 2>/dev/null
+                wmctrl -c "Program Error" 2>/dev/null
+                rm -f "$log_file"
+                # Logic continues to retry if return 1 is not triggered here
+            else
+                pkill -f "$proc_base" 2>/dev/null
+                rm -f "$log_file"
+                return 0 # Success
+            fi
+        fi
+
+        # If we failed, wait a bit and try again
+        ((retries--))
+        sleep 1
+    done
+
+    return 1 # Failed
+}
+
+
+# --- SMART AUTO-DISCOVERY  ---
+echo "Scanning home for screensaver collections..."
+BEST_FOLDER=$(find "$HOME" -maxdepth 9 -iname "*.scr" -not -path "*/.*" -not -path "$WINEPREFIX_PATH/*" -print -quit 2>/dev/null | xargs -0 -I {} dirname "{}")
+
+SCR_SOURCE=$(zenity --file-selection --directory --title="Select folder containing .scr files" --filename="${BEST_FOLDER}/" --width=600)
 
 # --- MAIN LOGIC BLOCK ---
 if [ -n "$SCR_SOURCE" ]; then
-    echo "[INFO] Analyzing source: $SCR_SOURCE"
+    imported=0
+    skipped=0
 
-    # Check for Assets (DLLs/Data)
+    # Check for Assets
     CRITICAL_ASSETS=$(find "$SCR_SOURCE" -maxdepth 1 -type f -not -iname "*.scr" -not -iname "*.txt" | wc -l)
 
     if [ "$CRITICAL_ASSETS" -gt 0 ]; then
-        echo "[DEBUG] Assets found. Opening Checklist."
         CHECKLIST_ARGS=()
-        MAX_FILE_LEN=0
         while IFS= read -r -d '' file; do
             CHECKLIST_ARGS+=("TRUE" "$file")
-            [ ${#file} -gt "$MAX_FILE_LEN" ] && MAX_FILE_LEN=${#file}
         done < <(find "$SCR_SOURCE" -maxdepth 1 -type f -not -path "$SCR_SOURCE" -printf "%f\0" | sort -z)
 
-        LIST_WIDTH=$(( MAX_FILE_LEN * 10 + 200 ))
-        [ "$LIST_WIDTH" -lt 600 ] && LIST_WIDTH=600
-        [ "$LIST_WIDTH" -gt 1100 ] && LIST_WIDTH=1100
+        CHOICE=$(zenity --list --title="Selective Import" --width=800 --height=450 --checklist --text="Select files to import:" --column="Pick" --column="File Name" "${CHECKLIST_ARGS[@]}" --separator="|")
 
-        CHOICE=$(zenity --list --title="Selective Import" --width=$LIST_WIDTH --height=450 \
-            --checklist --text="Select files to import from:\n$SCR_SOURCE" \
-            --column="Pick" --column="File Name" "${CHECKLIST_ARGS[@]}" --separator="|")
-
-        # Handle Checklist Result
         if [ $? -eq 0 ] && [ -n "$CHOICE" ]; then
             IFS="|" read -ra SELECTED_FILES <<< "$CHOICE"
             for filename in "${SELECTED_FILES[@]}"; do
-                # EXTENSION-ONLY NORMALIZATION: Keep name, lowercase extension
+                target_name="${filename%.*}.${filename##*.}"
+                if [ -f "$SCR_DEST/${target_name,,}" ]; then continue; fi
+
+                if [[ "$filename" == *.scr ]]; then
+                    if test_screensaver "$SCR_SOURCE/$filename"; then
+                        cp -vn "$SCR_SOURCE/$filename" "$SCR_DEST/${filename%.*}.${filename##*.}"
+                        ((imported++))
+                    else
+                        ((skipped++))
+                    fi
+                else
+                    cp -vn "$SCR_SOURCE/$filename" "$SCR_DEST/$filename"
+                fi
+            done
+        fi
+    else
+        # Surgical Import with Progress Bar
+        total_files=$(find "$SCR_SOURCE" -maxdepth 1 -iname "*.scr" | wc -l)
+        # Initialize with 3 counters (Imported:Skipped:Existing)
+        echo "0:0:0" > /tmp/import_stats
+
+        (
+            current_file=0
+            while IFS= read -r -d '' full_path; do
+                filename=$(basename "$full_path")
                 ext="${filename##*.}"
                 base="${filename%.*}"
                 target_name="${base}.${ext,,}"
 
-                cp -vn "$SCR_SOURCE/$filename" "$SCR_DEST/$target_name"
-                echo "  -> Imported: $filename as $target_name"
-            done
-            zenity --info --text="Imported ${#SELECTED_FILES[@]} items (Fixed .scr extension)." --timeout=2
-        fi
-    else
-        # Surgical Import (Only .scr)
-        echo "[INFO] Clean folder. Fixing extensions while preserving names."
-        SCR_COUNT=0
+                # 1. SKIP & INCREMENT EXISTING COUNTER
+                if [ -f "$SCR_DEST/$target_name" ]; then
+                    IFS=":" read -r imp skip exist < /tmp/import_stats
+                    echo "$imp:$skip:$((exist+1))" > /tmp/import_stats
+                    continue
+                fi
 
-        while IFS= read -r -d '' full_path; do
-            filename=$(basename "$full_path")
+                ((current_file++))
+                echo "$((current_file * 100 / total_files))"
+                echo "# Testing: $filename"
 
-            # EXTENSION-ONLY NORMALIZATION
-            ext="${filename##*.}"
-            base="${filename%.*}"
-            target_name="${base}.${ext,,}"
+                if test_screensaver "$full_path"; then
+                    cp -vn "$full_path" "$SCR_DEST/$target_name"
+                    IFS=":" read -r imp skip exist < /tmp/import_stats
+                    echo "$((imp+1)):$skip:$exist" > /tmp/import_stats
+                else
+                    IFS=":" read -r imp skip exist < /tmp/import_stats
+                    echo "$imp:$((skip+1)):$exist" > /tmp/import_stats
+                fi
+            done < <(find "$SCR_SOURCE" -maxdepth 1 -iname "*.scr" -print0)
+        ) | zenity --progress --title="Importing & Testing" --text="Validating..." --percentage=0 --auto-close
 
-            cp -vn "$full_path" "$SCR_DEST/$target_name"
-            ((SCR_COUNT++))
-            echo "  -> Normalized: $filename -> $target_name"
-        done < <(find "$SCR_SOURCE" -maxdepth 1 -iname "*.scr" -print0)
+        IFS=":" read -r imported skipped existing < /tmp/import_stats
+        rm -f /tmp/import_stats
 
-        if [ "$SCR_COUNT" -gt 0 ]; then
-            zenity --info --text="Imported $SCR_COUNT screensaver(s) with fixed extensions." --timeout=2
-        else
-            zenity --error --text="No .scr files found in source."
-        fi
+        # Final Summary
+        zenity --info --title="Import Summary" \
+            --text="Process complete!\n\nImported: $imported\nSkipped: $skipped\nAlready Installed: $existing" \
+            --width=300
     fi
 fi
 
-# 5. FINAL TERMINATION
+
+
 relaunch_menu
 exit 0

@@ -20,12 +20,23 @@ CONF_FILE="$WINEPREFIX_PATH/scrensaver.conf"
 
 # --- HELPER: STANDARDIZED RELAUNCH ---
 relaunch_menu() {
+    # 1. Clean the lock file so the new menu can start
     rm -f "$WINEPREFIX_PATH/.running"
-    if command -v winscreensaver >/dev/null; then
-        winscreensaver &
-    else
-        bash "$WINEPREFIX_PATH/winscr_menu.sh" &
+
+    # 2. Heal the Daemon (Only if not already running)
+    if ! pgrep -f "winscr_screensaver.sh" >/dev/null; then
+        pkill -f "winscreensaver" 2>/dev/null
+        wineserver -k 2>/dev/null
+        sleep 0.5
+        bash "$WINEPREFIX_PATH/winscr_screensaver.sh" &
     fi
+
+    # 3. Always launch the menu script directly
+    # This ignores the 'winscreensaver' command check and uses your script
+    bash "$WINEPREFIX_PATH/winscr_menu.sh" &
+
+    # 4. Exit
+    exit 0
 }
 
 # --- 1. SCAN FOR SCREENSAVERS ---

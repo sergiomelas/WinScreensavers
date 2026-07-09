@@ -30,6 +30,7 @@ if [ -f ".running" ]; then
         exit 0
     fi
 fi
+
 echo $$ > ".running"
 
 # --- 2. MASTER INTEGRITY AUDIT (Strict No-Wildcard Check) ---
@@ -132,6 +133,7 @@ esac
 
 # --- 5. UNIVERSAL HANDOVER ---
 rm -f "$WINEPREFIX_PATH/.running"
+
 if [ -f "$WINEPREFIX_PATH/$ACTION" ]; then
     bash "$WINEPREFIX_PATH/$ACTION" &
 else

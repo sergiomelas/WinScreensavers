@@ -3,6 +3,11 @@
 # Final version 2026 - Universal Edition (Fixes First-Run Icon/Path Bug)
 # Developed for X11/Wayland & KDE/Gnome/XFCE by sergio melas 2026
 
+# Identity Configuration
+export DEBFULLNAME="Sergio Melas"
+export DEBEMAIL="sergiomelas@gmail.com"
+MAINTAINER="${DEBFULLNAME} <${DEBEMAIL}>"
+
 echo " "
 echo " ##################################################################"
 echo " #                                                                #"
@@ -16,7 +21,7 @@ echo " ##################################################################"
 echo " "
 
 PACKAGE_NAME="winscreensaver"
-VERSION="4.0"
+VERSION="4.1"
 BUILD_ROOT="./${PACKAGE_NAME}_${VERSION}"
 
 # 1. CLEAN & PREPARE
@@ -35,7 +40,7 @@ Section: utils
 Priority: optional
 Architecture: all
 Depends: wine, wine32, xprintidle, x11-utils, procps, swayidle, zenity, xdotool
-Maintainer: Sergio Melas <sergiomelas@gmail.com>
+Maintainer: ${MAINTAINER}
 Description: Windows .scr manager for Linux.
 EOF
 

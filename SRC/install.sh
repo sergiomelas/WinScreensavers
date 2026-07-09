@@ -33,56 +33,15 @@ echo "Initializing Wine Prefix and Rebuilding Registry..."
 # wineboot -u ensures .reg files (user.reg, system.reg, userdef.reg) are healthy
 wineboot -u > /dev/null 2>&1
 
-# 2. THE SMART VALIDATION LOOP
-while true; do
-    # Check for existing screensavers in the destination
-    CURRENT_COUNT=$(find "$SCR_DEST" -maxdepth 1 -iname "*.scr" 2>/dev/null | wc -l)
+# 2. DEPLOY PAYLOAD
+echo "Deploying scripts and configurations..."
 
-    if [ "$CURRENT_COUNT" -gt 0 ]; then
-        echo "Integrity Check: $CURRENT_COUNT screensavers found. Proceeding to payload deployment."
-        break
-    fi
-
-    # --- SPACE-PROOF AUTO-DISCOVERY ---
-    echo "Scanning home for screensaver collections..."
-    # Find the first .scr and get its directory
-    BEST_FOLDER=$(find "$HOME" -maxdepth 9 -iname "*.scr" -not -path "*/.*" -print -quit 2>/dev/null | xargs -0 -I {} dirname "{}")
-
-    if [ -n "$BEST_FOLDER" ] && [ -d "$BEST_FOLDER" ]; then
-         SCR_SOURCE=$(zenity --file-selection --directory \
-         --title="Import Screensavers, Preselected folder is the one with most .scr" \
-         --filename="$BEST_FOLDER/")
-    else
-        SCR_SOURCE=$(zenity --file-selection --directory --title="Select folder containing .scr files")
-    fi
-
-    # User clicked Cancel
-    if [ -z "$SCR_SOURCE" ]; then
-        zenity --error --text="Installation aborted. Local environment is incomplete."
-        exit 1
-    fi
-
-    # 3. FINAL COPY VALIDATION
-    SOURCE_COUNT=$(find "$SCR_SOURCE" -maxdepth 1 -iname "*.scr" 2>/dev/null | wc -l)
-    if [ "$SOURCE_COUNT" -gt 0 ]; then
-        cp -v "$SCR_SOURCE"/*.scr "$SCR_DEST/" 2>/dev/null
-        zenity --info --text="Successfully imported $SOURCE_COUNT screensavers." --timeout=3
-        break
-    else
-        zenity --error --text="The selected folder contains 0 .scr files. Please pick another."
-    fi
-done
-
-# 4. DEPLOY PAYLOAD & AUTOSTART (REFRESH LOGIC)
-echo "Deploying/Refreshing scripts and configurations..."
-
-# Always force update scripts (-f)
+# Always force update scripts
 cp -f "$SYS_PATH"/*.sh "$WINEPREFIX_PATH/"
-# Preserving user settings for configs if they exist (-n)
 cp -n "$SYS_PATH"/*.conf "$WINEPREFIX_PATH/" 2>/dev/null
 chmod +x "$WINEPREFIX_PATH"/*.sh
 
-# Register background service for login
+# Register background service
 cat <<EOF > "$REAL_HOME/.config/autostart/winscreensaver.desktop"
 [Desktop Entry]
 Type=Application
@@ -93,13 +52,30 @@ X-GNOME-Autostart-enabled=true
 Name=WinScreensaver Service
 EOF
 
-# 5. BACKGROUND PROCESS RESTART
-# Ensure the background monitor is running the fresh code
+# 3. POST-DEPLOYMENT: INTELLIGENT REFRESH
+# Check if system32 is empty
+SCR_COUNT=$(find "$SCR_DEST" -maxdepth 1 -iname "*.scr" | wc -l)
+
+if [ "$SCR_COUNT" -eq 0 ]; then
+    # SCENARIO A: Fresh Install (Empty)
+    zenity --info --text="First-time setup detected. Launching Importer..." --timeout=2
+    bash "$WINEPREFIX_PATH/winscr_import.sh"
+else
+    # SCENARIO B: Upgrade/Refresh (Existing files found)
+    # Give the user a choice: Refresh/Add more or skip import
+    zenity --question --title="System Update" \
+    --text="Screensaver environment already exists ($SCR_COUNT files).\n\nDo you want to run the Importer to add/test new screensavers?" \
+    --width=400
+
+    if [ $? -eq 0 ]; then
+        bash "$WINEPREFIX_PATH/winscr_import.sh"
+    fi
+fi
+
+# 4. RESTART BACKGROUND PROCESS (Always restart after updates)
 pkill -f "winscr_screensaver.sh"
 bash "$WINEPREFIX_PATH/winscr_screensaver.sh" &
 
-# 6. UNLOCK & FINISH
+# 5. UNLOCK & FINISH
 rm -f "$WINEPREFIX_PATH/.running"
-
-echo "Installation/Refresh successful!"
-zenity --info --title="Success" --text="Installation successful!\n\n- Registry verified\n- Scripts updated\n- Background monitor restarted."
+zenity --info --title="Success" --text="Installation/Refresh successful!"

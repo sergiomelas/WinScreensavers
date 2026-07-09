@@ -17,16 +17,27 @@ WINEPREFIX_PATH="$HOME/.winscr"
 SYS_PAYLOAD="/usr/share/winscreensaver/Payload"
 GITHUB_REPO="sergiomelas/WinScreensavers"
 GITHUB_URL="https://github.com/$GITHUB_REPO"
-CURRENT_VER="3.2"
+CURRENT_VER="4.1"
 
 # --- HELPER: STANDARDIZED RELAUNCH ---
 relaunch_menu() {
+    # 1. Clean the lock file so the new menu can start
     rm -f "$WINEPREFIX_PATH/.running"
-    if command -v winscreensaver >/dev/null; then
-        winscreensaver &
-    else
-        bash "$WINEPREFIX_PATH/winscr_menu.sh" &
+
+    # 2. Heal the Daemon (Only if not already running)
+    if ! pgrep -f "winscr_screensaver.sh" >/dev/null; then
+        pkill -f "winscreensaver" 2>/dev/null
+        wineserver -k 2>/dev/null
+        sleep 0.5
+        bash "$WINEPREFIX_PATH/winscr_screensaver.sh" &
     fi
+
+    # 3. Always launch the menu script directly
+    # This ignores the 'winscreensaver' command check and uses your script
+    bash "$WINEPREFIX_PATH/winscr_menu.sh" &
+
+    # 4. Exit
+    exit 0
 }
 
 # Added "Check for Update" as a third extra button
@@ -52,7 +63,11 @@ elif [ "$RESPONSE" = "Check for Update" ]; then
     elif [ "$LATEST_TAG" == "v$CURRENT_VER" ] || [ "$LATEST_TAG" == "$CURRENT_VER" ]; then
         zenity --info --text="You are up to date! (v$CURRENT_VER is the latest version)."
     else
-        if zenity --question --text="A new version ($LATEST_TAG) is available!\n\nWould you like to go to the releases page?"; then
+    # Show the version difference and let the user decide
+        if zenity --question \
+            --title="Version Mismatch / Possible Upgrade Available" \
+            --text="Current version: v$CURRENT_VER\nLatest version: $LATEST_TAG\n\nWould you like to visit the release page to update?" \
+            --width=350; then
             xdg-open "$GITHUB_URL/releases" &
         fi
     fi
